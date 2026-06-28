@@ -2,13 +2,32 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SKILLS_DIR="$HOME/.claude/skills"
 FORCE=false
 
-if [[ "${1:-}" == "--force" ]]; then
-    FORCE=true
+# Detect target directory from flags
+SKILLS_DIR=""
+for arg in "$@"; do
+    case "$arg" in
+        --force)   FORCE=true ;;
+        --codex)   SKILLS_DIR="$HOME/.codex/skills" ;;
+        --claude)  SKILLS_DIR="$HOME/.claude/skills" ;;
+        --agents)  SKILLS_DIR="$HOME/.agents/skills" ;;
+        *)         echo "Unknown flag: $arg"; echo "Usage: ./install.sh [--claude|--codex|--agents] [--force]"; exit 1 ;;
+    esac
+done
+
+# Default: auto-detect runtime
+if [[ -z "$SKILLS_DIR" ]]; then
+    if command -v claude &>/dev/null; then
+        SKILLS_DIR="$HOME/.claude/skills"
+    elif command -v codex &>/dev/null; then
+        SKILLS_DIR="$HOME/.codex/skills"
+    else
+        SKILLS_DIR="$HOME/.agents/skills"
+    fi
 fi
 
+echo "Installing to: $SKILLS_DIR"
 mkdir -p "$SKILLS_DIR"
 
 installed=0
@@ -31,7 +50,7 @@ for skill_dir in "$SCRIPT_DIR"/*/; do
     fi
 
     ln -s "$skill_dir" "$target"
-    echo "  ok: $name → $target"
+    echo "  ok: $name"
     installed=$((installed + 1))
 done
 

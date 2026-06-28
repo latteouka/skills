@@ -1,13 +1,26 @@
-# Claude Code Skills
+# Skills
 
-可分享的 Claude Code skills 合集。核心是 `/wave`——開發波次規劃與啟動框架，支援軟體開發和通用工作場景。
+可跨平台分享的 AI coding agent skills 合集。支援 Claude Code、Codex、Copilot CLI、Gemini CLI。
+
+核心是 `/wave`——工作波次規劃與啟動框架，支援軟體開發和通用工作場景。
 
 ## 安裝
 
 ```bash
-git clone <repo-url> ~/projects/skills
+git clone https://github.com/latteouka/skills.git ~/projects/skills
 cd ~/projects/skills
 ./install.sh
+```
+
+install.sh 會自動偵測你的 runtime（Claude Code / Codex），安裝到對應的 skills 目錄。
+
+也可以手動指定：
+
+```bash
+./install.sh --claude   # ~/.claude/skills/
+./install.sh --codex    # ~/.codex/skills/
+./install.sh --agents   # ~/.agents/skills/ (跨平台通用)
+./install.sh --force    # 覆蓋已存在的 skill
 ```
 
 ## 包含的 Skills
@@ -40,7 +53,14 @@ Wave 會自動偵測工作模式：
 ./uninstall.sh
 ```
 
+## 支援的 Runtime
+
+| Runtime | Skills 目錄 | 旗標 |
+|---------|------------|------|
+| Claude Code | `~/.claude/skills/` | `--claude`（預設） |
+| Codex | `~/.codex/skills/` | `--codex` |
+| Copilot CLI / Gemini CLI | `~/.agents/skills/` | `--agents` |
+
 ## 依賴
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
-- Wave 的 dev 模式依賴 [superpowers](https://github.com/anthropics/claude-code-plugins) 的 `brainstorming` 和 `using-git-worktrees` skills（Claude Code 內建）
+- Wave 的 dev 模式依賴 [superpowers](https://github.com/anthropics/claude-code-plugins) 的 `brainstorming` 和 `using-git-worktrees` skills（Claude Code 內建；Codex 需另裝）

@@ -2,7 +2,29 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SKILLS_DIR="$HOME/.claude/skills"
+
+# Detect target directory from flags
+SKILLS_DIR=""
+for arg in "$@"; do
+    case "$arg" in
+        --codex)   SKILLS_DIR="$HOME/.codex/skills" ;;
+        --claude)  SKILLS_DIR="$HOME/.claude/skills" ;;
+        --agents)  SKILLS_DIR="$HOME/.agents/skills" ;;
+        *)         echo "Unknown flag: $arg"; echo "Usage: ./uninstall.sh [--claude|--codex|--agents]"; exit 1 ;;
+    esac
+done
+
+if [[ -z "$SKILLS_DIR" ]]; then
+    if command -v claude &>/dev/null; then
+        SKILLS_DIR="$HOME/.claude/skills"
+    elif command -v codex &>/dev/null; then
+        SKILLS_DIR="$HOME/.codex/skills"
+    else
+        SKILLS_DIR="$HOME/.agents/skills"
+    fi
+fi
+
+echo "Uninstalling from: $SKILLS_DIR"
 
 removed=0
 
