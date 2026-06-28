@@ -7,7 +7,7 @@ SKILLS_DIR="$HOME/.claude/skills"
 removed=0
 
 for skill_dir in "$SCRIPT_DIR"/*/; do
-    [[ -f "$skill_dir/SKILL.md" ]] || continue
+    [[ -f "$skill_dir/SKILL.md" ]] || ls "$skill_dir"/skills/*/SKILL.md &>/dev/null || continue
     name="$(basename "$skill_dir")"
     target="$SKILLS_DIR/$name"
 

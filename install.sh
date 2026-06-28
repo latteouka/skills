@@ -15,7 +15,8 @@ installed=0
 skipped=0
 
 for skill_dir in "$SCRIPT_DIR"/*/; do
-    [[ -f "$skill_dir/SKILL.md" ]] || continue
+    # Support both flat (SKILL.md at root) and plugin (skills/*/SKILL.md) structures
+    [[ -f "$skill_dir/SKILL.md" ]] || ls "$skill_dir"/skills/*/SKILL.md &>/dev/null || continue
     name="$(basename "$skill_dir")"
     target="$SKILLS_DIR/$name"
 
