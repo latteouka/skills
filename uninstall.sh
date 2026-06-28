@@ -16,7 +16,7 @@ for skill_dir in "$SCRIPT_DIR"/*/; do
         if [[ "$real" == "$skill_dir"* || "$real" == "${skill_dir%/}" ]]; then
             rm "$target"
             echo "  rm: $name"
-            ((removed++))
+            removed=$((removed + 1))
         else
             echo "skip: $name (symlink points elsewhere: $real)"
         fi

@@ -24,14 +24,14 @@ for skill_dir in "$SCRIPT_DIR"/*/; do
             rm -rf "$target"
         else
             echo "skip: $name (already exists, use --force to override)"
-            ((skipped++))
+            skipped=$((skipped + 1))
             continue
         fi
     fi
 
     ln -s "$skill_dir" "$target"
     echo "  ok: $name → $target"
-    ((installed++))
+    installed=$((installed + 1))
 done
 
 echo ""
