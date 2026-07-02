@@ -376,6 +376,8 @@ git log --oneline -20
 
 ## Metadata
 - **涉及檔案/目錄**: [目錄 glob 清單，用於交集分析]
+- **Checkpoint 分段**: C1: [項] / C2: [項] / ...（每 3 項一段，re-grounding 錨點）
+- **恢復指引**: 新 session 接手 → 讀 `.claude/dev/wave-{id}-ledger.md` 末尾 RESUME POINTER，按「中斷恢復協議」以 git 為準續跑
 
 ## 狀態：🟢 規劃完成，待啟動
 
@@ -521,7 +523,9 @@ cd .claude/worktrees/wave-{id}
 
 > ⚠️ **守衛檢查：在 worktree 內執行 `git rev-parse --show-toplevel`，確認輸出路徑包含 `worktrees/wave-{id}`。不在 worktree 內就停下來，不往下走。**
 
-把 Phase 5 產出的 `.claude/dev/wave-{id}.md` 寫入 worktree（不是 main）。
+把 Phase 5 產出的 `.claude/dev/wave-{id}.md` 寫入 worktree（不是 main），同時建立 `.claude/dev/wave-{id}-ledger.md`（格式見「狀態外部化」節）。
+
+**開工前基線綠燈（dev mode）：** 開工第一個動作 = 跑一次現有測試基線（輸出帶唯一標記字串確認是本輪跑出的），把結果記進 ledger 第一行（例：`基線：153 檔 / 1503 tests passed`）。之後任何紅燈都可歸因是本波引入還是既存問題。general mode 跳過此步。
 
 **Step 2: 宣告後直接開工（不停）**
 
@@ -623,6 +627,54 @@ cd .claude/worktrees/wave-{id}
 3. **不受影響的工作繼續推進**——標記、派發、實作照常，不因待決事項閒置。若該決策封鎖出貨（如安全 HIGH），先宣告封鎖閘門（「此決策未解前本波不標待人測」）再繼續其他工作
 4. **在下一個自然節點批次呈報**——問題連同進度一起交出，附推薦方案與影響範圍
 5. 只有當該決策**阻塞所有剩餘工作**時，才真正停下等待
+
+### 狀態外部化——Dashboard + Ledger 雙層（dev + general 共用）
+
+> **CRITICAL: 記憶不可靠，檔案才可靠。進度狀態一律外部化到兩個檔案，喚醒/恢復/續跑都以檔案 + git 為準。**
+
+| 檔案 | 性質 | 內容 |
+|------|------|------|
+| `.claude/dev/wave-{id}.md` | 進度快照（就地更新） | 工作項狀態表、合約結果、稽核結果 |
+| `.claude/dev/wave-{id}-ledger.md` | append-only 流水帳 | 每次派工/裁決/commit/錯誤一行；末尾維護 RESUME POINTER 與 ERRATA 區 |
+
+**Ledger 格式：**
+
+```markdown
+# Wave {id} Ledger（append-only，新條目往下加）
+
+## 流水帳
+- [HH:MM] 基線：153 檔 / 1503 tests passed
+- [HH:MM] 派工 task-1 implementer
+- [HH:MM] task-1 commit abc1234，合約 7/7 綠
+- [HH:MM] 使用者裁定：Option A（擴充 editScope）
+
+## ERRATA（controller 自我教訓，永久有效）
+- 教訓：SendMessage 前核對 agent 角色（曾誤送 Task 2 reviewer）
+
+## 暫停意圖
+（使用者下節流/暫停指令時寫入；「可以繼續」時清除。有內容時不派新工作）
+
+## RESUME POINTER（隨進度更新，下個 session 照抄接手）
+1. cd .claude/worktrees/wave-{id}
+2. git log --oneline -10 + git status 核實真實狀態
+3. 讀 wave-{id}.md 比對，不一致以 git 修正文件
+4. 下一步：[具體指出下一個未完成項與動作]
+```
+
+**Ledger 使用規則：**
+- **每次派工、裁決、commit、錯誤後立即 append 一行**——不等收尾才補
+- **ERRATA**：controller 犯錯（誤送訊息、漏跑合約、錯判狀態）→ 記一行「教訓：...」。之後每個心跳 prompt（見 Subagent-Driven 長跑協議）必須帶上全部 ERRATA 條目——一次性錯誤變永久約束
+- **暫停意圖外部化**：使用者下節流/暫停指令（「usage 快爆了先停」）→ 讓 in-flight 工作跑完、不派新工作，並把暫停意圖寫進 ledger，防止喚醒後誤判為斷線而繼續派工。使用者說「可以繼續」才清除
+
+**中斷恢復協議（git 為準）：**
+
+任何新 session 續跑步驟：
+1. cd 進 worktree
+2. **先核實 git 真實狀態**：`git log` + `git status` 找已 commit 項與未 commit 半成品——以 git 為準，不以文件記載或記憶為準
+3. 讀 `wave-{id}.md` + ledger RESUME POINTER，比對 git 狀態，不一致以 git 修正文件
+4. 從第一個真正未完成項續跑
+
+長工作不受單一 session 存活限制。
 
 ### 以下僅 mode = dev（現有規範不動）
 
