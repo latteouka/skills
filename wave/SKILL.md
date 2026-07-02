@@ -111,22 +111,31 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 
 如果沒有新素材，跳過此 Phase。
 
-### Phase 2: 掃描工作項
+### Phase 2: 掃描工作項（loop-until-dry）
 
-自動執行（不問使用者）：
+> **CRITICAL: 掃描完備優先於掃描速度。四個來源各掃一輪後再掃一輪，連續兩輪無新工作項才准停。防「掃到夠交差就停」。**
+
+自動執行（不問使用者），四個來源：
 
 ```bash
-# 讀取所有 requirements 檔案
+# 來源 1：requirements 未完成項
 find docs/requirements/ -name "*.md" -exec grep -l "🔴\|🟡\|❓" {} \;
 
-# 讀取最近 git log 了解已完成的工作
-git log --oneline -20
+# 來源 2：程式內待辦標記
+grep -rn "TODO\|FIXME" src/ lib/ app/ 2>/dev/null | head -50
 
-# 讀取 .claude/dev/wave-*.md（如果存在，看上波殘留）
-ls .claude/dev/wave-*.md 2>/dev/null
+# 來源 3：所有舊 wave 的延後決策
+grep -A 20 "📋 延後決策" .claude/dev/wave-*.md 2>/dev/null
+
+# 來源 4：git log 近況（找做一半的工作）
+git log --oneline -20
 ```
 
-從 requirements 中收集所有未完成項（🔴 未實作 / 🟡 部分實作 / ❓ 未決）。
+從四來源收集所有未完成項（🔴 未實作 / 🟡 部分實作 / ❓ 未決 / 延後決策 / 半成品）。
+
+**Loop-until-dry 規則：** 四來源掃完一輪後，帶著已找到的工作項**再掃一輪**（第二輪常因理解了脈絡而多挖出關聯項）。連續兩輪無新項 → 掃描完成。
+
+> **CRITICAL: 規模與時長脫鉤。工作項數量以完整覆蓋為準，禁止以「session 會太長」「先做核心」「這波先做一部分」為由在規劃期縮範圍。真 blocker 在該項旁標註原因交使用者裁定。**
 
 **交集分析（多波時）：** 如果 Phase 0 偵測到其他進行中的波，對比本波工作項預期動到的檔案與其他波的涉及檔案。有交集的記錄下來，Phase 4 會顯示預警。
 
