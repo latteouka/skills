@@ -1,6 +1,6 @@
 ---
 name: wave
-description: 規劃並啟動一波工作。自動偵測開發/通用模式，讀 requirements → 偵測是否需要 align 新素材 → 分類自主/人判斷項 → 產出 living dashboard + session prompt + goal condition。支援多波並行（各波獨立 worktree + dashboard）。觸發詞：/wave、開新波、新一波、plan wave、啟動開發、啟動工作。子指令：/wave status（全局概覽）、/wave drop {id}（放棄一波）。旗標：--dev（強制開發模式）、--general（強制通用模式）。
+description: 規劃並啟動一波工作。自動偵測開發/通用模式，讀 requirements → 偵測是否需要 align 新素材 → 分類自主/人判斷項 → 產出 living dashboard + goal condition → 選執行方式後原地開工。所有 wave 一律在獨立 worktree 中執行。觸發詞：/wave、開新波、新一波、plan wave、啟動開發、啟動工作。子指令：/wave status（全局概覽）、/wave drop {id}（放棄一波）。旗標：--dev（強制開發模式）、--general（強制通用模式）。
 argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方向"
 ---
 
@@ -57,8 +57,7 @@ done
 
 **Step 2: 自動命名本波**
 
-- **單波**（無其他 🟢/🟡 波）：跳過命名，自動用日期 ID（`wave-0627`）
-- **多波**（已有其他波在跑）：Claude 從工作項方向自動生成 ID（如 `report-ui`），不問使用者。使用者不滿意才改
+Claude 從工作項方向自動生成 ID（如 `suspect-merge`、`report-ui`），不問使用者。使用者不滿意才改。無其他波在跑時也可用日期 ID（`wave-0630`）。
 
 Dashboard 檔名：`.claude/dev/wave-{id}.md`
 
@@ -216,6 +215,21 @@ ls .claude/dev/wave-*.md 2>/dev/null
 3. 再做 🤖👁️ 項（E2E 先驗 → 殘項交人）
 4. 最後做 👁️ 純人眼微調
 
+#### Grill/Spec 決策審計（Phase 2.5 有觸發 grill 時必做）
+
+> **CRITICAL: 分類完工作項後，必須回頭比對 grill/brainstorming 產出的所有決策。沒有對應工作項的決策 = 延後決策，必須明確追蹤。**
+
+1. **收集決策源** — 讀取 Phase 2.5 的 grill/brainstorming 紀錄（spec 文件、grill 對話中的共識）
+2. **逐條比對** — 每個決策是否有對應的工作項（🤖 / 🤖👁️ / 👁️）
+3. **建立延後清單** — 沒有對應工作項的決策列入「📋 延後決策」，每項記錄：
+   - 決策內容（一句話）
+   - 來源（spec 哪段 / grill 哪題）
+   - 延後原因（scope cut / blocker / 依賴未就緒）
+   - 建議優先順序（🔴 安全相關 / 🟡 功能完整性 / 🟢 nice-to-have）
+4. **零延後也要寫** — 如果所有決策都有對應工作項，明確寫「本波涵蓋所有 grill/spec 決策，無延後項」
+
+沒有跑 grill/brainstorming 的波不需要這步。
+
 #### mode = general
 
 將工作項分類（二分法，不需要 🤖👁️ 中間態）：
@@ -364,6 +378,13 @@ ls .claude/dev/wave-*.md 2>/dev/null
 ### 詳細 Findings
 （每個 finding 附 severity / 位置 / 建議修法）
 
+## 📋 延後決策（Deferred from grill/spec）
+<!-- Phase 2.5 有觸發 grill/brainstorming 時必填此區塊；沒觸發時整區刪除 -->
+| # | 決策 | 來源 | 延後原因 | 優先順序 |
+|---|------|------|---------|---------|
+| 1 | [決策內容] | [spec §N / grill Q#] | [scope cut / blocker] | 🔴/🟡/🟢 |
+<!-- 無延後項時寫：「本波涵蓋所有 grill/spec 決策，無延後項。」 -->
+
 ## 📋 Feedback（人測後填寫區）
 （使用者只需測上面「殘項」和「人看什麼」欄位列出的項目，其餘 Claude 已按合約驗過）
 ```
@@ -392,40 +413,28 @@ ls .claude/dev/wave-*.md 2>/dev/null
 （人 review 後填寫區）
 ```
 
-#### 輸出 2: Session Prompt（給使用者複製貼入新 session）
+#### 輸出 2: Session Context（寫入 wave-{id}.md 備查，不需要使用者複製）
 
-包含：
-- 這波的完整脈絡和目標
-- 工作項清單（含優先序）
-- 自主決策規則
-- 執行時的行為規範（更新 wave-{id}.md、requirements 回寫、Playwright 自驗）
-- 相關檔案路徑
+Wave 規劃過程中 Claude 已經擁有完整脈絡（工作項、合約、決策、相關檔案），不需要輸出一份 session prompt 讓使用者複製貼上。改為：
 
-**多波時額外加入：**
+1. 把關鍵脈絡摘要寫入 `wave-{id}.md` 的 Metadata 區（供中斷恢復用）
+2. 多波時額外記錄並行規則到 Metadata：
 
 ```markdown
-## 本波資訊
-- **Wave ID**: {id}
-- **Dashboard**: `.claude/dev/wave-{id}.md`
+## Metadata
+- **涉及檔案/目錄**: [目錄 glob 清單]
 - **並行波**: [其他波 ID + 狀態]
-- **Worktree**: [worktree 路徑]
-
-## 並行規則
-- 只讀寫 `wave-{id}.md`，不碰其他 wave-*.md
-- 不動其他波正在處理的檔案：[列出其他波的涉及檔案]
-- 其他檔案自由修改
+- **並行規則**: 只碰 wave-{id}.md，不動 [列出其他波涉及檔案]
 ```
 
-單波時不加這些段落——完全向下相容。
-
-#### 輸出 3: Goal Condition（給使用者貼在 /goal 後面）
+#### 輸出 3: Goal Condition（Claude 自動設定）
 
 遵循 goal condition 五原則：
 - 可觀測、可驗證、有範圍、有約束、簡短
 - 完成條件只包含自主項 + 人測項「已實作已標記」
 - 不把人測通過當作完成條件
 
-格式範例：
+**mode = dev 格式：**
 ```
 Wave {id} 全部完成。完成標準：
 (1) 所有 🤖 項合約指令全部跑過，輸出貼在 wave-{id}.md 對應合約結果欄
@@ -434,7 +443,8 @@ Wave {id} 全部完成。完成標準：
 (4) 每項覆蓋 happy path + edge case + 誤用場景（合約內列的全部跑過）
 (5) 品質閘門通過：🔒 安全 skill 0 high/critical，🎨 UX 審計已執行並記錄到 wave-{id}.md
 (6) requirements 對應項狀態已更新
-(7) wave-{id}.md 狀態更新為「待人測」
+(7) wave-{id}.md「📋 延後決策」區已填寫（有 grill 時列出所有未落地決策 + 優先順序；無 grill 時寫「未觸發 grill」）
+(8) wave-{id}.md 狀態更新為「待人測」
 約束：不動其他波正在處理的檔案（[列出其他波 ID: 涉及檔案]）。不碰其他 wave-*.md。
 合約輸出必須是本輪實際跑出的，不可憑記憶填。
 ```
@@ -450,43 +460,96 @@ Wave {id} 全部完成。完成標準：
 約束：[同現有多波約束]
 ```
 
-### Phase 6: 指示使用者下一步
+### Phase 6: 建立 Worktree → 選擇執行方式 → 開工
 
-**單波時：**
+> **CRITICAL: 不要叫使用者 /clear 再貼 prompt。規劃完直接在本 session 繼續。**
+
+> **CRITICAL: 所有 wave 一律在獨立 worktree 中執行，不在 main 工作。無例外。不管是單波還是多波、不管專案大小、不管工作項多少。這是硬性規則，不是建議。**
+
+**Step 1: 建立 Worktree（開工前的強制動作）**
+
+在展示執行選項之前，先建立 worktree：
+
+```bash
+# 建立 wave branch + worktree
+git branch wave/{id} 2>/dev/null || true
+git worktree add .claude/worktrees/wave-{id} wave/{id}
 ```
-✅ Wave 規劃完成！
 
-你的下一步：
-1. /clear
-2. 貼入上面的 Session Prompt
-3. /goal [貼入上面的 Goal Condition]
-4. 離開做別的事，2-3 小時後回來看 .claude/dev/wave-{id}.md
+建立完成後，**立即切換工作目錄到 worktree**：
 
-（Session Prompt 和 Goal Condition 已輸出在上方，直接複製即可）
+```bash
+cd .claude/worktrees/wave-{id}
 ```
 
-**多波時：**
+> ⚠️ **守衛檢查：在 worktree 內執行 `git rev-parse --show-toplevel`，確認輸出路徑包含 `worktrees/wave-{id}`。不在 worktree 內就停下來，不往下走。**
+
+把 Phase 5 產出的 `.claude/dev/wave-{id}.md` 寫入 worktree（不是 main）。
+
+**Step 2: 展示執行選項**
+
+向使用者展示 goal condition 並問執行方式：
+
 ```
 ✅ Wave {id} 規劃完成！
 
-你的下一步：
-1. 開新終端，用 /using-git-worktrees 建立 worktree
-2. 在 worktree 裡 /clear
-3. 貼入上面的 Session Prompt
-4. /goal [貼入上面的 Goal Condition]
-5. 離開做別的事，完成後 Claude 會提示你 merge 回 main
+🌿 Worktree: .claude/worktrees/wave-{id} (branch: wave/{id})
 
-目前並行的波：[列出其他波 ID + 狀態]
-隨時可用 /wave status 查看全局進度。
+📋 Goal Condition:
+[貼出 goal condition 內容]
+
+選擇執行方式：
+1. **Subagent-Driven**（推薦）— 每個工作項派獨立 subagent，中間 checkpoint review
+2. **Inline Execution** — 在此 session 直接逐項執行，每項完成後 checkpoint review
+
+選哪種？
 ```
+
+如果有其他並行的波，額外顯示：
+```
+⚠️ 並行波：[列出其他波 ID + 狀態]
+```
+
+**Step 3: 開工**
+
+使用者選擇後：
+
+**選 1 — Subagent-Driven：**
+1. 用 `/goal` 設定 goal condition
+2. 觸發 `/subagent-driven-development` 或 `/dispatching-parallel-agents`（依工作項獨立性判斷）
+3. 每個 subagent 完成一項後回報，Claude review 合約結果
+4. 全部完成後跑品質閘門 + 收尾流程
+
+**選 2 — Inline Execution：**
+1. 用 `/goal` 設定 goal condition
+2. 按工作項排序逐項執行（遵循執行泵行為規範）
+3. 每項 commit 後更新 wave-{id}.md
+4. 全部完成後跑品質閘門 + 收尾流程
+
+兩種方式都遵循同一套執行泵行為規範（見下方），差別只在並行度。**所有檔案操作都在 worktree 內進行。**
 
 ---
 
-## 執行泵的行為規範（寫入 Session Prompt）
+## 執行泵的行為規範
 
-以下規則會被嵌入每個 wave 的 session prompt 中，確保 /goal 執行時 Claude 自動遵循：
+以下規則在 /goal 執行時 Claude 自動遵循（無論 Subagent-Driven 或 Inline Execution）：
 
-> 以下規範依 mode 分區。「共用」段落 dev + general 都嵌入 session prompt；「mode = dev」段落只在 dev 模式嵌入。
+> 以下規範依 mode 分區。「共用」段落 dev + general 都適用；「mode = dev」段落只在 dev 模式適用。
+
+### Worktree 守衛（每次執行動作前）
+
+> **CRITICAL: 寫任何檔案之前，確認 cwd 在 worktree 內。**
+
+```bash
+# 守衛檢查——不在 worktree 就停
+[[ "$(git rev-parse --show-toplevel)" == *worktrees/wave-* ]] || { echo "ERROR: 不在 worktree 內，停止執行"; exit 1; }
+```
+
+如果發現自己在 main 工作目錄而非 worktree，**立即停下**，先執行 Phase 6 Step 1 建立 worktree 再繼續。不要在 main 寫任何程式碼。
+
+### 開工前必讀（每個 wave session 啟動時）
+
+- **`.claude/dev/playwright-guide.md`** — 專案的 Playwright 使用指南（不存在就跳過）。寫 E2E 前必讀，按裡面的 pattern 寫。
 
 ### 品質優先——不趕不跳
 
@@ -582,6 +645,55 @@ Wave {id} 全部完成。完成標準：
 1. 用 Playwright 截圖自檢，確認元素存在、佈局不破版
 2. 在 wave-{id}.md 附截圖路徑 + 明確寫出「需要人判斷什麼」
 
+### Playwright 使用指南（自動累積）
+
+> **CRITICAL: E2E 不是每次從零 try and error。開工前讀指南，解決問題後寫回指南。**
+
+**檔案位置：** `.claude/dev/playwright-guide.md`（專案級，每個專案各自維護一份）
+
+**開工前讀：**
+- 寫任何 Playwright 測試之前，先讀 `.claude/dev/playwright-guide.md`（不存在就跳過）
+- 同時讀全局坑 `~/projects/CLAUDE.md` 裡的 E2E-PITFALLS 段落
+- 按指南裡的 pattern 寫測試，不要自己重新摸索
+
+**執行中寫：**
+每次遇到以下情況，**解決後立即**更新 `.claude/dev/playwright-guide.md`：
+- Playwright 測試因非預期原因失敗 → 記下根因 + 解法
+- 找到該專案有效的 selector 策略 → 記下 pattern（例：這個專案用 `data-testid` / 用 role / 用 text）
+- 找到該專案的 auth/session 處理方式 → 記下 storageState 路徑和設定
+- 找到避免 flaky 的有效手段 → 記下（例：等 network idle、waitForSelector 的特定用法）
+- 找到該專案 CI vs local 的差異 → 記下
+
+**指南格式：**
+
+```markdown
+# Playwright Guide — [專案名]
+
+## Auth & Session
+- storageState 路徑：...
+- 登入流程：...
+
+## Selector 策略
+- 優先用：...
+- 避免用：...
+
+## 已知坑
+### [日期] [問題描述]
+- 症狀：...
+- 根因：...
+- 解法：...
+
+## 有效 Pattern
+### [Pattern 名]
+- 用途：...
+- 範例：...
+```
+
+**原則：**
+- 每次 append 新段落，不刪舊內容（除非過時）
+- 不存在就建，建了就持續維護
+- 不問使用者「要不要記」——靜默維護
+
 ### 自主決策規則
 
 在 /goal 執行中遇到需要判斷的點：
@@ -592,9 +704,25 @@ Wave {id} 全部完成。完成標準：
 
 ### 收尾流程（所有項完成 + 閘門通過後）
 
+> **CRITICAL: 完成宣告不可只看 goal condition。必須同時揭露延後決策債務。**
+
 1. 把 `wave-{id}.md` 狀態標 ✅「待人測」
-2. **單波時**：提示使用者來人測
-3. **多波時**：提示使用者「本波完成，可以 merge 回 main 或先等其他波」
+2. **延後決策揭露**（Phase 2.5 有觸發 grill/brainstorming 時）：
+   - 讀取 wave-{id}.md 的「📋 延後決策」區塊
+   - 在完成報告中**醒目列出**所有延後項，格式：
+     ```
+     ## ⚠️ 本波延後決策（grill/spec 共識未落地）
+     
+     | # | 決策 | 優先順序 | 延後原因 |
+     |---|------|---------|---------|
+     | 1 | 匯入他案嫌疑人需先核准 | 🔴 安全 | scope cut |
+     | 2 | 合併四步 wizard | 🟡 完整性 | 只做了入口 |
+     
+     建議下波優先處理 🔴 項。
+     ```
+   - 延後項為零時明確寫：「✅ 本波涵蓋所有 grill/spec 決策，無延後項。」
+   - **這段在 goal condition 判定之外**——即使 goal 全綠，延後項仍需揭露
+3. 提示使用者「本波完成，可以 merge 回 main」+ 來人測
 
 ### 以下僅 mode = general
 
@@ -618,8 +746,15 @@ Wave {id} 全部完成。完成標準：
 
 ### 隔離策略
 
-- **單波**（無其他 🟢/🟡 波）→ 直接在 main 工作（原本行為），零摩擦
-- **多波**（有其他波在跑）→ 一律開 worktree，各波獨立 branch
+Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由和並行安全保證。
+
+**為什麼不在 main 工作：** 使用者經常在多個 tmux session 同時對同專案開 wave。如果有「單波在 main」的路徑，兩個 session 同時啟動就會 race condition——都以為自己是第一個。一律 worktree 從設計上消除這個問題，不需要偵測、不需要旗標。單波也一樣——規則統一才不會有漏洞。
+
+**並行安全保證：**
+1. 所有波在獨立 worktree 工作，互不影響 working tree
+2. 每個波只讀寫自己的 `wave-{id}.md`
+3. `playwright-guide.md` 併發寫入處理：每個 worktree 維護自己的副本，merge 回 main 時自動合併（append-only 格式天然可合併）
+4. `prisma/schema.prisma` 等共用檔案的衝突在 merge 階段處理（見合併協助段落）
 
 ### `/wave status` — 全局概覽
 
