@@ -676,6 +676,43 @@ cd .claude/worktrees/wave-{id}
 
 長工作不受單一 session 存活限制。
 
+### Subagent-Driven 長跑協議（選 Subagent-Driven 執行方式時適用）
+
+主 session 作為 controller，額外遵循：
+
+**Brief-driven 派工：**
+- 派 implementer subagent 前，先寫 `task-N-brief.md`（放 worktree 的 `.claude/dev/` 下），內容：
+  1. 需求描述 + 裁定結論
+  2. 程式現況（`file:line` 引用，註明「行號可能漂移，以語意定位」）
+  3. 驗證合約（從 dashboard 複製該項完整合約）
+  4. 硬約束（不可碰的檔案/目錄，如其他波涉及範圍）
+- Subagent 開場指令 =「先讀你的 brief，它就是你的 requirements」——subagent 不依賴 controller 的對話 context
+- 大項（schema 變更、跨系統）另寫 `task-N-design.md`，設計過使用者 review 才動手
+- Implementer 完成寫 `task-N-report.md`，controller 與 reviewer 都讀
+
+**管線不斷料（pipeline priming）：**
+趁當前 task 在跑，controller 預寫下一批 brief、做前置預檢（DB 起了沒、測試環境可用嗎）——不閒等。
+
+**心跳 fallback（ScheduleWakeup）：**
+- 每次派背景 subagent 後，排一個 ScheduleWakeup fallback（1200s+，非短輪詢；環境無此工具則跳過此保險）——背景完成通知失靈時的斷線保險
+- Wakeup prompt **完整重述狀態**，不依賴記憶即可續泵。模板：
+
+```
+Wave {id} SDD 執行泵 fallback。已完成：[task 清單+commit]。進行中：[task+agent]。
+後續序列：[N→N+1→...]。封鎖閘門：[如「安全 HIGH 未解不得標待人測」，無則寫無]。
+ERRATA：[ledger ERRATA 全部條目]。
+喚醒後：先核 git 真實狀態與 ledger，暫停意圖區有內容則只記錄不派工。
+```
+
+- **Stale wakeup 核實**：喚醒內容與現實可能脫節（說 X 實作中但其實已 commit）→ 先核 git 真實狀態再行動，不盲從喚醒內容、也不盲從記憶。喚醒內容與使用者最後指示衝突時，問人不擅斷
+- 與 `/goal` 分工：goal 判定「做完了沒」，心跳保證「沒做完就繼續動」
+
+**空跑偵測：**
+Subagent 回傳異常（0 tool uses、秒級返回、無 commit）→ 視為沒實際執行。核 git 確認無半成品後重派，不把空跑當完成。
+
+**Reviewer 不信報告：**
+每 task 的 reviewer 必須**親自重跑**測試/typecheck/lint，不採信 implementer 的 report 文字。權限/安全敏感項升級 security rigor。共用 branch 交錯時，review 範圍用明確 commit SHA 指定，不用 range。
+
 ### 以下僅 mode = dev（現有規範不動）
 
 ### 驗證合約執行規則
