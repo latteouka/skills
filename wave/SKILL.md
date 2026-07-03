@@ -551,6 +551,8 @@ cd .claude/worktrees/wave-{id}
 
 把 Phase 5 產出的 `.claude/dev/wave-{id}.md` 寫入 worktree（不是 main），同時建立 `.claude/dev/wave-{id}-ledger.md`（格式見「狀態外部化」節）。
 
+**Gitignore 防護（建 worktree 後立即檢查）：** 專案 `.gitignore` 必須含 `.claude/worktrees/` 與 `.superpowers/` 兩條——缺哪條補哪條，隨本波首個 commit 進版控。防止 worktree（embedded git repo）與 SDD scratch 被 `git add -A` 吃進 git。註：`wave-{id}.md` 與 ledger **刻意不 ignore**——下波掃描延後決策、多波 registry、中斷接手都依賴它們在版控內。
+
 **開工前基線綠燈（dev mode）：** 開工第一個動作 = 跑一次現有測試基線（輸出帶唯一標記字串確認是本輪跑出的），把結果記進 ledger 第一行（例：`基線：153 檔 / 1503 tests passed`）。之後任何紅燈都可歸因是本波引入還是既存問題。general mode 跳過此步。
 
 **Step 2: 宣告後直接開工（不停）**
@@ -712,7 +714,7 @@ cd .claude/worktrees/wave-{id}
 主 session 作為 controller，額外遵循：
 
 **Brief-driven 派工：**
-- 派 implementer subagent 前，先寫 `task-N-brief.md`（放 worktree 的 `.claude/dev/` 下），內容：
+- 派 implementer subagent 前，先寫 `task-N-brief.md`（三件套 brief/report/design 一律放 worktree 的 `.superpowers/sdd/` 下——該目錄 gitignored，屬一次性 scratch 不進版控），內容：
   1. 需求描述 + 裁定結論
   2. 程式現況（`file:line` 引用，註明「行號可能漂移，以語意定位」）
   3. 驗證合約（從 dashboard 複製該項完整合約）
