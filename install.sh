@@ -33,11 +33,9 @@ mkdir -p "$SKILLS_DIR"
 installed=0
 skipped=0
 
-for skill_dir in "$SCRIPT_DIR"/*/; do
-    # Support both flat (SKILL.md at root) and plugin (skills/*/SKILL.md) structures
-    [[ -f "$skill_dir/SKILL.md" ]] || ls "$skill_dir"/skills/*/SKILL.md &>/dev/null || continue
-    name="$(basename "$skill_dir")"
-    target="$SKILLS_DIR/$name"
+link_skill() {
+    local src="$1" name="$2"
+    local target="$SKILLS_DIR/$name"
 
     if [[ -e "$target" || -L "$target" ]]; then
         if [[ "$FORCE" == true ]]; then
@@ -45,13 +43,27 @@ for skill_dir in "$SCRIPT_DIR"/*/; do
         else
             echo "skip: $name (already exists, use --force to override)"
             skipped=$((skipped + 1))
-            continue
+            return
         fi
     fi
 
-    ln -s "$skill_dir" "$target"
+    ln -s "$src" "$target"
     echo "  ok: $name"
     installed=$((installed + 1))
+}
+
+for skill_dir in "$SCRIPT_DIR"/*/; do
+    if [[ -f "$skill_dir/SKILL.md" ]]; then
+        # Flat structure: SKILL.md at repo root
+        link_skill "$skill_dir" "$(basename "$skill_dir")"
+    elif ls "$skill_dir"/skills/*/SKILL.md &>/dev/null; then
+        # Plugin structure: link each inner skill dir — linking the repo root
+        # leaves no top-level SKILL.md and the skill never registers
+        for inner in "$skill_dir"/skills/*/; do
+            [[ -f "$inner/SKILL.md" ]] || continue
+            link_skill "$inner" "$(basename "$inner")"
+        done
+    fi
 done
 
 echo ""

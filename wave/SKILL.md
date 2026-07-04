@@ -101,6 +101,12 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 
 如果使用者在 `/wave` 後面直接帶了參數（檔案路徑或文字），跳過這個問題直接進 Phase 1。
 
+**Align 停點的接續動作（收到答案後依序執行）：**
+
+1. 有新素材 → Phase 1 Align 落檔
+2. 執行 Phase 2 四來源掃描——**在此之前不得預掃**：Phase 0 只允許 mode 偵測與 registry 掃描，requirements / TODO / git log 的內容掃描一律在本動作才開跑
+3. 掃描收斂 → Phase 2.5 判斷
+
 ### Phase 1: Align（有新素材時）
 
 執行簡化版 align：
@@ -230,9 +236,9 @@ git log --oneline -20
 | 工作項性質 | 自動加入的安全 skill |
 |-----------|---------------------|
 | API route / tRPC router / middleware | `/insecure-defaults` + `/sharp-edges` |
-| Auth / 權限 / session / crypto | 三個全開（含 `/static-analysis`） |
+| Auth / 權限 / session / crypto | 三個全開（含 `/semgrep`） |
 | 新增 dependency / config 變更 | `/insecure-defaults` |
-| 任何 `.ts/.tsx` 程式碼變更 | `/static-analysis`（semgrep baseline） |
+| 任何 `.ts/.tsx` 程式碼變更 | `/semgrep`（semgrep baseline） |
 
 **🔒 步驟的效力：**
 - high / critical findings → **blocking**，必須修到 0 才能 commit
@@ -539,6 +545,8 @@ Wave {id} 全部完成。完成標準：
 
 **Step 1: 建立 Worktree（開工前的強制動作）**
 
+**工具載入**：deferred-tool 環境先 `ToolSearch select:EnterWorktree,ExitWorktree,TaskCreate,TaskUpdate,ScheduleWakeup,SendMessage` 一次載齊本 skill 用到的原生工具（查無者視為環境不提供，走各條款的 fallback）。
+
 在輸出啟動宣告之前，先建立 worktree。**優先用原生工具**：環境有 `EnterWorktree` 工具時，直接 `EnterWorktree({ name: "wave-{id}" })`——harness 建立並追蹤 worktree，cwd 不會漂移（原生工具的 branch 命名由 harness 決定，如 `worktree-wave-{id}`，與手動流程的 `wave/{id}` 視同等效）。
 
 無原生工具時 fallback 手動流程：
@@ -587,8 +595,8 @@ cd .claude/worktrees/wave-{id}
 
 **選 1 — Subagent-Driven：**
 1. 確認 goal condition 已寫入 wave-{id}.md「🎯 Goal Condition」區塊（使用者若下 /goal 則同步；沒下也以此區塊為準）
-2. 觸發 `/subagent-driven-development` 或 `/dispatching-parallel-agents`（依工作項獨立性判斷）
-3. 每個 subagent 完成一項後回報，Claude review 合約結果
+2. 每一批派工＝三連動作：① 備 brief（分級規則見「Brief-driven 派工」）② 派 implementer（背景、帶 model tier）③ **立即排 ScheduleWakeup fallback**（delay 分層見「心跳 fallback」；環境無此工具才可跳過，且在 ledger 記一行「無 ScheduleWakeup，跳過心跳」）
+3. 每個 subagent 完成一項後回報，controller 親自重跑合約 review（不採信報告文字）
 4. 全部完成後跑品質閘門 + 收尾流程
 
 **選 2 — Inline Execution：**
@@ -727,15 +735,15 @@ cd .claude/worktrees/wave-{id}
 主 session 作為 controller，額外遵循：
 
 **Brief-driven 派工：**
-- 派 implementer subagent 前，先寫 `task-N-brief.md`（三件套 brief/report/design 一律放 worktree 的 `.superpowers/sdd/` 下——該目錄 gitignored，屬一次性 scratch 不進版控），內容：
+- 每個 implementer 的 brief 含四要素：
   1. 需求描述 + 裁定結論
   2. 程式現況（`file:line` 引用，註明「行號可能漂移，以語意定位」）
   3. 驗證合約（從 dashboard 複製該項完整合約）
   4. 硬約束（不可碰的檔案/目錄，如其他波涉及範圍）
-- Subagent 開場指令 =「先讀你的 brief，它就是你的 requirements」——subagent 不依賴 controller 的對話 context
+- **Brief 分級**：小項（單檔、合約短）→ 四要素完整內嵌 Agent prompt 即可；大項（schema 變更、跨系統、多檔）→ 必須落檔 `task-N-brief.md` 並另寫 `task-N-design.md` 過使用者 review 才動手（三件套 brief/report/design 放 worktree 的 `.superpowers/sdd/` 下——gitignored scratch 不進版控）
+- Subagent 開場指令 =「先讀你的 brief，它就是你的 requirements」（內嵌時 prompt 本身即 brief）——subagent 不依賴 controller 的對話 context
 - **模型分層**：派工時依項目性質選 model tier——機械、範圍明確的實作項 → `model: "sonnet"`；瑣碎查證/整理 → `haiku`；跨系統、架構性、難 debug 的項 → 省略（繼承 session 模型）。拿不準就省略。Reviewer 與收尾稽核的 tier 不得低於該項 implementer
-- 大項（schema 變更、跨系統）另寫 `task-N-design.md`，設計過使用者 review 才動手
-- Implementer 完成寫 `task-N-report.md`，controller 與 reviewer 都讀
+- Implementer 完成**一律**交付 report：大項寫 `task-N-report.md`；小項可改為回填鏡像 Task 的 description 或在回報訊息附完整合約輸出。controller 與 reviewer 都讀
 
 **管線不斷料（pipeline priming）：**
 趁當前 task 在跑，controller 預寫下一批 brief、做前置預檢（DB 起了沒、測試環境可用嗎）——不閒等。
