@@ -641,7 +641,7 @@ cd .claude/worktrees/wave-{id}
 
 ### 長跑行為規範（dev + general 共用）
 
-> **CRITICAL: 以下七條在整個執行期持續生效。長 session、compaction、跨 session 續跑都不豁免。**
+> **CRITICAL: 以下八條在整個執行期持續生效。長 session、compaction、跨 session 續跑都不豁免。**
 
 **1. 自主運作——反提早收尾**
 - 可逆且在 goal 範圍內的動作直接做，不問「要不要繼續？」「需要我做 X 嗎？」
@@ -680,6 +680,33 @@ cd .claude/worktrees/wave-{id}
 - 偵測到外部依賴不可達（DB、內網 API、LLM endpoint、網路斷線）→ **主動暫停受影響的 in-flight 工作**（含背景 agent，用 SendMessage 通知暫停）——壞環境下繼續跑實驗/測試只會產生垃圾證據
 - 暫停原因寫入 ledger「暫停意圖」區（與使用者主動暫停同一機制）；不受影響的工作項照常推進
 - 恢復前 controller 親自驗證依賴可達（實跑連線指令取證，不憑推測），驗證過才恢復；恢復用 SendMessage 續跑原 agent，附上環境現況與已驗證證據
+
+**8. 換路煞車**
+- 同一方法連續失敗 **2 次** → 停止重試，換方法或回頭重蒐證——不是第 3 次重試
+- 蹺蹺板偵測：修 A 壞 B、修 B 又壞 A → 退回起點重新定位根因（你在治標不治本）
+- **斷言是契約不是障礙**：測試紅 → 修實作，不得改弱斷言/放寬預期讓它變綠
+- 發現自己在「猜」而不是「推導」（要寫出「應該可以」「大概是」時）→ 先停下拿證據再動手
+
+### 重大結論抗辯（dev + general 共用）
+
+> **CRITICAL: 重大結論採信前必須過三鏡頭抗辯。單一模型的自我檢查會系統性偏袒自己的結論。**
+
+**觸發時機**：bug 根因判定、架構/設計選擇、安全判斷、任何會影響生產或不可逆操作依據的結論。瑣碎修改、純查證不觸發。
+
+**流程**：
+1. 把待審結論整理成自足陳述：結論一句話 + 依據證據（file:line、測試輸出）+ 影響範圍
+2. **同一則訊息平行派三個 subagent**（general-purpose，預設立場一律「推翻它」）：
+   - **skeptic（正確性）**：列出結論依賴的所有假設，逐一實查（Read/Grep/Bash），主動構造反例；理由須具體到 file:line 或可重現步驟
+   - **red-team（安全與失效）**：輸入邊界、權限與機密、競態、部分失敗髒狀態、注入面——能實查必實查
+   - **simplifier（簡潔性）**：有沒有更簡單的做法？過度工程？REFUTED 必須附具體簡化方案
+   - 回傳格式統一：`verdict: REFUTED|SURVIVED` + 具體理由。模型依「模型分層」規則選
+3. **裁決（過半存活制）**：3/3 或 2/3 SURVIVED → 採信（2/3 時把 REFUTED 理由列入風險回報）；≤1/3 → 結論擋回，修正後重審
+4. **規模校準**：影響生產/資料/全域佈署的重大結論 → 連續 2 輪抗辯無新 REFUTED 才收工（每輪附已審理由防重複）；其餘一輪即可
+5. 未經抗辯的重大結論只能標「**未抗辯假設**」，不得當事實陳述或作為行動依據
+
+**與其他機制分工**：收尾稽核驗**交付物**（合約輸出真偽），抗辯驗**結論**（判斷對錯）——不互相取代。與第 5 條銜接：交人裁定前先抗辯自證，呈報時附抗辯結果表。
+
+（三鏡頭抗辯流程參考自 [fable-harness](https://github.com/Miguok/fable-harness)，MIT）
 
 ### 狀態外部化——Dashboard + Ledger 雙層（dev + general 共用）
 
@@ -735,12 +762,14 @@ cd .claude/worktrees/wave-{id}
 主 session 作為 controller，額外遵循：
 
 **Brief-driven 派工：**
-- 每個 implementer 的 brief 含四要素：
+- 每個 implementer 的 brief 含六要素：
   1. 需求描述 + 裁定結論
   2. 程式現況（`file:line` 引用，註明「行號可能漂移，以語意定位」）
   3. 驗證合約（從 dashboard 複製該項完整合約）
   4. 硬約束（不可碰的檔案/目錄，如其他波涉及範圍）
-- **Brief 分級**：小項（單檔、合約短）→ 四要素完整內嵌 Agent prompt 即可；大項（schema 變更、跨系統、多檔）→ 必須落檔 `task-N-brief.md` 並另寫 `task-N-design.md` 過使用者 review 才動手（三件套 brief/report/design 放 worktree 的 `.superpowers/sdd/` 下——gitignored scratch 不進版控）
+  5. 非目標（明確不做的事，至少一條——防順手改、防 scope 蔓延）
+  6. 停止條件（遇到即停手回報：要動範圍外檔案、要刪東西、發現機密、與硬約束衝突）
+- **Brief 分級**：小項（單檔、合約短）→ 六要素完整內嵌 Agent prompt 即可；大項（schema 變更、跨系統、多檔）→ 必須落檔 `task-N-brief.md` 並另寫 `task-N-design.md` 過使用者 review 才動手（三件套 brief/report/design 放 worktree 的 `.superpowers/sdd/` 下——gitignored scratch 不進版控）
 - Subagent 開場指令 =「先讀你的 brief，它就是你的 requirements」（內嵌時 prompt 本身即 brief）——subagent 不依賴 controller 的對話 context
 - **模型分層**：派工時依項目性質選 model tier——機械、範圍明確的實作項 → `model: "sonnet"`；瑣碎查證/整理 → `haiku`；跨系統、架構性、難 debug 的項 → 省略（繼承 session 模型）。拿不準就省略。Reviewer 與收尾稽核的 tier 不得低於該項 implementer
 - Implementer 完成**一律**交付 report：大項寫 `task-N-report.md`；小項可改為回填鏡像 Task 的 description 或在回報訊息附完整合約輸出。controller 與 reviewer 都讀
