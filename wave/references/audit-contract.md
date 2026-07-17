@@ -12,5 +12,5 @@
 > 5. **抓資料失真**（`quality-gates.md` 存在時）：抽跑鉤子檔「資料守恆錨點」的對帳指令，來源 vs 落庫對不上且無解釋 = ❌
 > 6. 回報逐項 ✅/❌ + 漏項清單 + 實際指令輸出
 > 7. **抓殘渣**：scratch 檔、debug 輸出（console.log/print 級）、註解掉的程式碼、孤兒 import——逐項具名列出（檔案+位置），籠統句不算完成本項
-> 8. **裁決格式**：回報第一行 = VERIFIED / VERIFIED WITH CAVEATS / REFUTED；
+> 8. **裁決格式**：回報不加標題、第一行直接是裁決詞 = VERIFIED / VERIFIED WITH CAVEATS / REFUTED；
 >    重跑不了的宣稱標 UNVERIFIABLE 列入 caveats，不默認為真
