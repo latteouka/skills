@@ -215,7 +215,6 @@ git log --oneline -20
 - `quality-gates.md` 存在時：鉤子檔「Gate 指令」表中觸發條件命中的指令，注入對應工作項合約（例：動到 parser → 該項合約加一條 `pnpm quality:affected --run`）
 - Bug fix 類工作項必含「孿生掃描」：修復後以該錯誤構造全案搜尋，合約結果欄寫
   `TWINS: searched <pattern> → N 處：<檔案清單或 none>`；命中者一併修或列入呈報
-  （出處：fable r14-15 外部實證 0/6→3/3，本地未複驗，列閱卷觀察名單）
 
 排序原則：先做有測試可驗的後端邏輯 → 再做 Playwright 可驗的 UI 功能 → 依賴關係決定其餘順序。
 

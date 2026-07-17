@@ -3,6 +3,8 @@
 
 ## 新條款三律
 1. Fixture 先行：先有「現版失敗、新版通過」的 testbed 證據才轉正；null 即不加
+   例外通道：無法本地 fixture 驗證的條款，得以（a）外部實證（如 fable eval 具體輪次數據）或
+   （b）floor-guard 定位（本地 null 但目標 tier 有實證/實戰失敗案例）上線——兩者皆須 provenance 帳本標注依據並列入閱卷觀察名單。
 2. 綁動作 artifact：條款綁編號動作、產出具名可重跑 artifact；缺席型義務走終端 artifact gate
 3. 加一減一：每次整合附刪減清單；core 硬上限 800 行（scripts/wave-lint.sh 強制）
 
