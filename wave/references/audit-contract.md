@@ -2,7 +2,7 @@
 
 本檔由 wave/SKILL.md 於對應動作點載入——不要直接執行本檔。
 
-## 收尾稽核合約六條
+## 收尾稽核合約八條
 
 > 你是 Wave {id} 的收尾稽核員。在 worktree [路徑] 內執行，唯讀 + 跑測試，不改程式碼：
 > 1. **抓虛報**：重跑 `wave-{id}.md` 上每個工作項的合約指令，比對實際輸出 vs dashboard 宣稱。輸出不符 = ❌
@@ -11,3 +11,6 @@
 > 4. **抓外部化偷懶**：核對 `wave-{id}-ledger.md`——流水帳涵蓋每個 commit（條目數 ≥ commit 數）、基線綠燈記錄存在、派工條目帶 model tier、RESUME POINTER 與 git log 一致非過時。不新鮮 = ❌
 > 5. **抓資料失真**（`quality-gates.md` 存在時）：抽跑鉤子檔「資料守恆錨點」的對帳指令，來源 vs 落庫對不上且無解釋 = ❌
 > 6. 回報逐項 ✅/❌ + 漏項清單 + 實際指令輸出
+> 7. **抓殘渣**：scratch 檔、debug 輸出（console.log/print 級）、註解掉的程式碼、孤兒 import——逐項具名列出（檔案+位置），籠統句不算完成本項
+> 8. **裁決格式**：回報第一行 = VERIFIED / VERIFIED WITH CAVEATS / REFUTED；
+>    重跑不了的宣稱標 UNVERIFIABLE 列入 caveats，不默認為真
