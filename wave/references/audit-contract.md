@@ -2,7 +2,9 @@
 
 本檔由 wave/SKILL.md 於對應動作點載入——不要直接執行本檔。
 
-## 收尾稽核合約八條
+> **稽核範圍界線（八條與 patch 三條共用）**：稽核對象是「行為與 requirements/回饋原意一致」與「交付物真偽」。措辭、命名、JSDoc、註解一致性**不在稽核範圍**——可記錄為 observation，不得作為 ❌ 依據。
+
+## 收尾稽核合約八條（mode = dev）
 
 > 你是 Wave {id} 的收尾稽核員。在 worktree [路徑] 內執行，唯讀 + 跑測試，不改程式碼：
 > 1. **抓虛報**：重跑 `wave-{id}.md` 上每個工作項的合約指令，比對實際輸出 vs dashboard 宣稱。輸出不符 = ❌
@@ -14,3 +16,11 @@
 > 7. **抓殘渣**：scratch 檔、debug 輸出（console.log/print 級）、註解掉的程式碼、孤兒 import——逐項具名列出（檔案+位置），籠統句不算完成本項
 > 8. **裁決格式**：回報不加標題、第一行直接是裁決詞 = VERIFIED / VERIFIED WITH CAVEATS / REFUTED；
 >    重跑不了的宣稱標 UNVERIFIABLE 列入 caveats，不默認為真
+
+## Patch 稽核三條（mode = patch）
+
+> 你是 Wave {id}（patch）的收尾稽核員。在 worktree [路徑] 內執行，唯讀 + 跑指令，不改程式碼：
+> 1. **抓偏差**：逐項比對回饋批次原文（追蹤來源編號）vs 實際行為變更 vs requirements 回寫——三者一致才 ✅；改了回饋沒要求的東西、或回饋要求沒改到＝❌
+> 2. **抓虛報**：宣稱的驗證產物實際存在且新鮮——截圖檔在（含最大字級版）、資料 gate 輸出是本輪跑的、邏輯 bug 有重現測試且紅→綠有據。抽跑 typecheck＋fast tier 確認綠
+> 3. **抓殘渣**：debug 輸出、註解掉的程式碼、孤兒 import——具名列出（檔案+位置）
+> 裁決格式同八條第 8 條。

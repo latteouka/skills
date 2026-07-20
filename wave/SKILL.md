@@ -1,6 +1,6 @@
 ---
 name: wave
-description: 規劃並啟動一波工作。自動偵測開發/通用模式，讀 requirements → 偵測是否需要 align 新素材 → 規劃工作項 + 驗證合約 → 產出 living dashboard + goal condition → 選執行方式後原地開工。所有工作項一律 Claude 自主完成 + 自驗，不設「待人測」分類。所有 wave 一律在獨立 worktree 中執行。觸發詞：/wave、開新波、新一波、plan wave、啟動開發、啟動工作。子指令：/wave status（全局概覽）、/wave drop {id}（放棄一波）。旗標：--dev（強制開發模式）、--general（強制通用模式）。
+description: 規劃並啟動一波工作。自動偵測開發/通用模式，讀 requirements → 偵測是否需要 align 新素材 → 規劃工作項 + 驗證合約 → 產出 living dashboard + goal condition → 選執行方式後原地開工。所有工作項一律 Claude 自主完成 + 自驗，不設「待人測」分類。所有 wave 一律在獨立 worktree 中執行。觸發詞：/wave、開新波、新一波、plan wave、啟動開發、啟動工作。子指令：/wave status（全局概覽）、/wave drop {id}（放棄一波）。旗標：--dev（強制開發模式）、--general（強制通用模式）、--patch（迭代輕快通道：回饋批次小修專用）。
 argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方向"
 ---
 
@@ -56,7 +56,8 @@ ls -d src/ lib/ app/ 2>/dev/null
 
 - **命中任一** → `mode = dev`，走完整開發流程（驗證合約 + 安全/UX 閘門）
 - **全未命中** → `mode = general`，走輕量流程（checklist review）
-- 使用者可覆寫：`/wave --dev` 強制開發模式、`/wave --general` 強制通用模式
+- 使用者可覆寫：`/wave --dev` 強制開發模式、`/wave --general` 強制通用模式、`/wave --patch` 迭代輕快通道
+- **patch 自動建議**：dev 專案且工作項全部來自回饋批次（驗收台 issue、LINE 回報、bug 清單 triage 結果）、無新模組、無 schema 變更、無架構決策 → Phase 4 建議改走 `mode = patch`（見「mode = patch（迭代輕快通道）」節），使用者確認才切
 
 偵測邏輯寬鬆——寧可多判成 dev 也不要漏。偵測結果在 Phase 4 向使用者顯示，使用者可當場改。
 
@@ -183,7 +184,7 @@ git log --oneline -20
 - UI 功能 → Playwright E2E 自動驗證（導航→操作→結果斷言）
 - Bug fix → 先寫重現測試再修
 - UX 流程 → Playwright 跑完整操作流程，斷言功能正確
-- 視覺/排版 → Playwright 截圖自檢，確認元素存在、佈局不破版
+- 視覺/排版 → Playwright 截圖自檢（預設＋最大字級各一張、空資料態），確認元素存在、佈局不破版、文字不重疊不溢位；**純樣式項不寫 unit test**（Smart TDD：UI styling 不需 TDD——截圖驗證取代）
 
 #### 驗證合約格式
 
@@ -233,6 +234,40 @@ git log --oneline -20
 4. **零延後也要寫** — 如果所有決策都有對應工作項，明確寫「本波涵蓋所有 grill/spec 決策，無延後項」
 
 沒有跑 grill/brainstorming 的波不需要這步。
+
+#### mode = patch（迭代輕快通道）
+
+> 適用：迭代/驗收期的回饋批次——工作項全部是小修（bug fix、文案、版面、呈現規則調整），無新模組、無 schema 變更、無架構決策。任一項不符 → 該項抽出走 dev 模式合約（或整波升級 dev）。**未列差異者一律照 dev 模式執行。**
+
+**規劃期（省）：**
+- Phase 2 四來源掃描跳過——工作清單＝回饋批次的 triage 結果（驗收台 issue、LINE 回報清單），逐項帶追蹤來源編號
+- Phase 2.5 跳過；例外：某項與 CONTEXT.md／requirements 既有共識矛盾 → 該項停下走衝突確認（列入 Phase 4 獨立問題），不默默改
+- 驗證合約改輕量三型（不寫五角度覆蓋場景）：
+
+| 工作項型 | 驗證方式 |
+|---|---|
+| UI 呈現／版面 | 截圖驗證：預設＋最大字級各一張、空資料態；**不寫 unit test** |
+| 資料呈現／欄位對應 | 專案資料 gate 加一條防回歸（quality-gates.md 有列者，如品質檢查 YAML），跑過貼輸出 |
+| 邏輯 bug | 維持 TDD：先寫重現測試再修＋TWINS 孿生掃描（護欄不縮水） |
+
+- 🔒 安全 skill：只有動到 API／auth／權限的項逐項跑；其餘改為全批收尾統一跑一次 semgrep baseline
+
+**執行期（省）：**
+- E2E 責任制縮為：blocking smoke 三斷言（照舊必跑）＋截圖自檢；**純呈現層調整不要求新寫 E2E spec**
+- 三鏡頭抗辯／advisor 諮詢點 1、4 不觸發（bug 根因判定仍照「重大結論抗辯」既有觸發條件）
+- Ledger 照記（中斷恢復仍靠它）
+
+**收尾（省）：**
+- 品質閘門＝typecheck＋fast tier 測試＋資料 gate（有鉤子檔時）＋**改動 view 截圖牆一輪**（預設＋最大字級）
+- 收尾稽核改「patch 稽核三條」（見 `references/audit-contract.md`）——稽核行為與回饋原意/requirements 一致、驗證產物真偽、殘渣；**不稽核措辭／命名／JSDoc 一致性**
+- Goal condition 四條：
+```
+Wave {id}（patch）完成。完成標準：
+(1) 回饋批次全項處理完或標記不修理由（含追蹤來源編號對應）
+(2) typecheck + fast tier + 資料 gate 綠，輸出貼 wave-{id}.md
+(3) 改動 view 截圖牆存在且已自檢（預設＋最大字級）
+(4) requirements 對應項已回寫；wave-{id}.md 標 ✅（patch 稽核三條通過）
+```
 
 #### mode = general
 
@@ -446,6 +481,7 @@ cd .claude/worktrees/wave-{id}
 > **CRITICAL: 做好比做快重要。寧可這波只完成 3 項全部零 bug，也不要 6 項完成但 3 項要回頭修。**
 
 - 合約全過才 commit（沒過 = 功能沒做完，不「先 commit 再修」）；不為趕進度跳過誤用場景測試；session 時長不是限制——執行細則見「驗證合約執行規則」與長跑規範第 3 條。
+- **禁止刪除或弱化失敗測試來變綠**：紅燈＝功能有 bug 或測試預期錯誤，一律走 INTENT 三方對齊裁定；刪測試、放寬斷言、skip 標記都不是通過手段。
 
 ### 長跑行為規範（dev + general 共用）
 
