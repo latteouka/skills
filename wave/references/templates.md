@@ -161,6 +161,61 @@ ERRATA：[ledger ERRATA 全部條目]。
 喚醒後：先核 git 真實狀態與 ledger，暫停意圖區有內容則只記錄不派工。
 ```
 
+## Goal Condition 模板
+
+Phase 5 輸出 3 依 mode 逐字填入（{id} 與約束代入本波實值）：
+
+**mode = dev：**
+```
+Wave {id} 全部完成。完成標準：
+(1) 所有工作項合約指令全部跑過，輸出貼在 wave-{id}.md 對應合約結果欄
+(2) 每項覆蓋 happy path + edge case + 誤用場景 + 適用的資料守恆/規模場景（合約內列的全部跑過）
+(3) 品質閘門通過：🔒 安全 skill 0 high/critical；專案 gate（quality-gates.md 有列者）全 PASS；🎨 UX 審計已執行並記錄，或依降級規則標「待 UX 補跑」封鎖閘門
+(4) requirements 對應項狀態已更新
+(5) wave-{id}.md「📋 延後決策」區已填寫（列出 grill 產出的所有未落地決策 + 優先順序；零延後明確寫零）
+(6) wave-{id}.md 狀態更新為「✅ 完成」
+(7) 🕵️ 收尾稽核 subagent 已跑且全 ✅，結果貼在 wave-{id}.md「🕵️ 稽核結果」區塊
+(8) 全程遵守唯一停點制——除「停點規則」所列合法停點與例外（Align、範圍確認、Phase 2.5 訪談、破壞性操作確認、阻塞全部剩餘工作的需人裁定）外未曾停下等待輸入
+約束：不動其他波正在處理的檔案（[列出其他波 ID: 涉及檔案]）。不碰其他 wave-*.md。
+合約輸出必須是本輪實際跑出的，不可憑記憶填。
+```
+
+**mode = general：**
+```
+Wave {id} 全部完成。完成標準：
+(1) 所有工作項 checklist 全勾 ✅，產出物已建立
+(2) requirements 對應項狀態已更新
+(3) wave-{id}.md 狀態更新為「✅ 完成」
+(4) 輕量稽核 subagent 已核對產出物存在/結構/內容，結果貼在 wave-{id}.md
+約束：[同現有多波約束]
+```
+
+**mode = patch：**
+```
+Wave {id}（patch）完成。完成標準：
+(1) 回饋批次全項處理完或標記不修理由（含追蹤來源編號對應）
+(2) typecheck + fast tier + 資料 gate 綠，輸出貼 wave-{id}.md
+(3) 改動 view 截圖牆存在且已自檢（預設＋最大字級）
+(4) requirements 對應項已回寫；wave-{id}.md 標 ✅（patch 稽核三條通過）
+```
+
+## 啟動宣告模板
+
+```
+✅ Wave {id} 規劃完成，直接開工。
+
+🌿 Worktree: .claude/worktrees/wave-{id} (branch: wave/{id})
+🚀 執行方式: [Phase 4 選定的方式]
+
+📋 Goal Condition:
+[貼出 goal condition 內容]
+```
+
+有其他並行的波時，額外顯示：
+```
+⚠️ 並行波：[列出其他波 ID + 狀態]
+```
+
 ## `/wave status` 輸出範例
 
 ```markdown
