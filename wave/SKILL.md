@@ -110,13 +110,14 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 
 執行簡化版 align：
 
-1. **Digest** — 讀取素材，摘出行為承諾 / 需求變更 / 新決策
-2. **Diff** — 比對 `docs/requirements/` 現有內容，分三類：
+1. **Digest** — 讀取素材，摘出行為承諾 / 需求變更 / 新決策。素材為逐字稿檔且專案有 `.claude/dev/feature-map.md` 時，先查其 STT 勘誤表校正固定轉錯詞
+2. **Ground** — 素材為口語化描述（打字或逐字稿）且專案有 `.claude/dev/feature-map.md` 時，把每個需求 resolve 成 route＋檔案範圍；完整程序（命中驗證／fallback 探索／❓ 集中 Phase 4／靜默累積）讀 `references/hooks-formats.md`「feature-map grounding 程序」節照做
+3. **Diff** — 比對 `docs/requirements/` 現有內容，分三類：
    - 🆕 新增（requirements 沒有的）
    - ⚠️ 衝突（與現有描述矛盾）
    - ✅ 一致（已對齊）
-3. **確認衝突** — 只有 ⚠️ 項需要使用者裁定（逐條，附推薦方案）
-4. **落檔** — 更新 `docs/requirements/` 對應檔案
+4. **確認衝突** — 只有 ⚠️ 項需要使用者裁定（逐條，附推薦方案）
+5. **落檔** — 更新 `docs/requirements/` 對應檔案
 
 如果沒有新素材，跳過此 Phase。
 
@@ -287,7 +288,7 @@ git log --oneline -20
 
 不阻擋，純資訊。無交集時不顯示。
 
-**❓/需裁定項的處理（必做）：** 掃描出的每個 ❓ 未決項必須做成 Phase 4 AskUserQuestion 的**獨立問題**（選項 = 各方案，推薦方案標 Recommended）——使用者就在停點上，裁定成本最低。**禁語：「先跳過」「下波再做」「待裁定後可追加」**。使用者裁定 → 該項排入本波；使用者明選「延後」→ 才進「📋 延後決策」區。不得由 Claude 自行決定延後。
+**❓/需裁定項的處理（必做）：** 掃描出的每個 ❓ 未決項、以及 Phase 1 Ground 對不到的每個 ❓ 項，必須做成 Phase 4 AskUserQuestion 的**獨立問題**（選項 = 各方案／最似位置推測，推薦方案標 Recommended）——使用者就在停點上，裁定成本最低。Grounding ❓ 項裁定後立即把確認的對應 append 回 `feature-map.md` 別名欄。**禁語：「先跳過」「下波再做」「待裁定後可追加」**。使用者裁定 → 該項排入本波；使用者明選「延後」→ 才進「📋 延後決策」區。不得由 Claude 自行決定延後。
 
 **執行方式推薦標籤鎖定：** 推薦固定為 Subagent-Driven（模板既定）。認為 Inline 更適合本波時，必須附一句具體理由（例：項間強依賴無法並行），且不得把「（推薦）」移到 Inline 上。
 

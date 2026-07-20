@@ -47,3 +47,33 @@
 - 用途：...
 - 範例：...
 ```
+
+## feature-map.md 格式範本
+
+```markdown
+# Feature Map — [專案名]
+
+> 口語素材 grounding 資產。維護規則：①別名只增不刪 ②route/檔案改動時同步更新對應行 ③命中前先驗證檔案存在，驗證失敗當場修行 ④累積靜默進行，不問使用者 ⑤檔案路徑寫完整（相對 [app 根目錄]），禁止縮寫。
+
+## 功能對照表
+
+| 功能 | Route | 主要檔案 | 口語別名（累積） |
+|---|---|---|---|
+| [正式功能名] | [/route/path 或（無 UI）] | [page／router／service 路徑，頓號分隔] | [口語講法，頓號分隔] |
+
+## STT 勘誤表（素材為逐字稿檔時查）
+
+| STT 常見輸出 | 正字 |
+|---|---|
+| [轉錯詞] | [正確詞] |
+```
+
+## feature-map grounding 程序
+
+Phase 1 Ground 步驟的完整程序（素材為口語化描述且專案有 `.claude/dev/feature-map.md` 時執行）：
+
+1. **逐項 resolve** — 把 Digest 產出的每個需求，用功能對照表對應成 route＋主要檔案
+2. **✅ 命中** — 對照表命中且 **ls/grep 驗證檔案存在**才算命中；驗證失敗（route 改名、檔案搬家）→ 當場更新 feature-map 該行、ledger 記一行，改走 fallback
+3. **未命中** — fallback 即時探索（Grep/Explore）；探索成功視同命中，並把口語講法 append 到該功能的別名欄
+4. **❓ 對不到** — 收集起來**不現場問**，帶到 Phase 4 停點一次問完（附最似位置推測選項）
+5. **靜默累積** — 命中但口語講法不在別名欄 → 立即 append；發現新的 STT 固定轉錯 → 立即 append 勘誤表。不問使用者、不報告（與 playwright-guide 同 pattern）
