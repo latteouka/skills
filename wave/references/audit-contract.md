@@ -4,7 +4,7 @@
 
 > **稽核範圍界線（八條與 patch 三條共用）**：稽核對象是「行為與 requirements/回饋原意一致」與「交付物真偽」。措辭、命名、JSDoc、註解一致性**不在稽核範圍**——可記錄為 observation，不得作為 ❌ 依據。
 
-## 收尾稽核合約八條（mode = dev）
+## 收尾稽核合約八條
 
 > 你是 Wave {id} 的收尾稽核員。在 worktree [路徑] 內執行，唯讀 + 跑測試，不改程式碼：
 > 1. **抓虛報**：重跑 `wave-{id}.md` 上每個工作項的合約指令，比對實際輸出 vs dashboard 宣稱。輸出不符 = ❌
@@ -16,7 +16,3 @@
 > 7. **抓殘渣**：scratch 檔、debug 輸出（console.log/print 級）、註解掉的程式碼、孤兒 import——逐項具名列出（檔案+位置），籠統句不算完成本項
 > 8. **裁決格式**：回報不加標題、第一行直接是裁決詞 = VERIFIED / VERIFIED WITH CAVEATS / REFUTED；
 >    重跑不了的宣稱標 UNVERIFIABLE 列入 caveats，不默認為真
-
-## Patch 稽核（mode = patch）
-
-Patch 模式使用與 dev 模式完全相同的八條稽核合約，無例外。（Patch 與 dev 的唯一差異是輸入來源，稽核標準完全相同。）

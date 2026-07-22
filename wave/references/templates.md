@@ -2,7 +2,7 @@
 
 本檔由 wave/SKILL.md 於對應動作點載入——不要直接執行本檔。
 
-## Dashboard 模板（dev 模式）
+## Dashboard 模板
 
 ```markdown
 # Wave {id} — [日期] [簡述]
@@ -55,78 +55,6 @@
 <!-- 無延後項時寫：「本波涵蓋所有 grill/spec 決策，無延後項。」 -->
 ```
 
-## Dashboard 模板（general 模式）
-
-```markdown
-# Wave {id} — [日期] [簡述]
-
-## Metadata
-- **Mode**: general
-- **恢復指引**: 新 session 接手 → 讀 `.claude/dev/wave-{id}-ledger.md` 末尾 RESUME POINTER，按「中斷恢復協議」以 git 為準續跑
-
-## 狀態：🟢 規劃完成，待啟動
-
-## 🎯 Goal Condition
-（貼 Phase 5 輸出 3 全文 (1)-(4)；收尾時逐條打勾）
-
-## 🤖 工作項
-| # | 工作項 | 狀態 | Checklist | 產出物 |
-|---|--------|------|-----------|--------|
-| 1 | ... | ⏳ 待做 | 0/3 ✅ | — |
-
-## 🕵️ 稽核結果（輕量稽核 subagent 填寫）
-（核對各項產出物存在/結構/內容的結果，有缺列出）
-```
-
-## Phase 4 工作範圍輸出範本
-
-> ## 這波工作範圍
-> 
-> ### 🤖-1: [功能名] — [一句話描述]
-> 來源：[requirements 哪個檔/哪行]
-> **驗證合約：**
-> 1. `[指令]` → [預期輸出]
-> 2. Happy path：[場景]
-> 3. Edge case：[場景]
-> 4. 誤用：[場景]
->
-> ### 🤖-2: ...
->
-> ---
-> **預估規模**：約 N 個 commit（規模以完整覆蓋為準，不以 session 長度為準）
-> **Checkpoint 分段**：每 3 項一段（C1: 🤖-1~3 / C2: 🤖-4~6 / ...），執行期 re-grounding 以段為錨點
->
-> **執行方式**（本次確認一併選定，Phase 6 不再另問）：
-> 1. **Subagent-Driven**（推薦）— 每個工作項派獨立 subagent，中間 checkpoint review
-> 2. **Inline Execution** — 在此 session 直接逐項執行，每項完成後 checkpoint review
-> 
-> 要調整嗎？（移除某些項 / 改合約覆蓋範圍 / 改優先序 / 換執行方式）
-
-## UX 審計推薦範本
-
-> ## 🎨 UX 品質閘門（完成所有項後批次執行）
-> 
-> 根據這波工作項性質，推薦以下審計：
-> - ✅ `/ui-test` — 本波含新頁面/整頁改版，跑探索性對抗測試（用大案規模資料）
-> - ✅ `/wcag-accessibility-audit` — 新增表單元件，檢查無障礙
-> - ⬚ `/nielsen-heuristics-audit` — 無新頁面，不推薦
-> - ⬚ `/ux-audit-rethink` — 非大改版，不推薦
-> 
-> 要調整嗎？（打勾/取消任一項）
-
-## 延後決策揭露範例
-
-```
-## ⚠️ 本波延後決策（grill/spec 共識未落地）
-
-| # | 決策 | 優先順序 | 延後原因 |
-|---|------|---------|---------|
-| 1 | 匯入他案嫌疑人需先核准 | 🔴 安全 | scope cut |
-| 2 | 合併四步 wizard | 🟡 完整性 | 只做了入口 |
-
-建議下波優先處理 🔴 項。
-```
-
 ## Ledger 格式
 
 ```markdown
@@ -163,14 +91,12 @@ ERRATA：[ledger ERRATA 全部條目]。
 
 ## Goal Condition 模板
 
-Phase 5 輸出 3 依 mode 逐字填入（{id} 與約束代入本波實值）：
-
-**mode = dev：**
+Phase 5 輸出 3 逐字填入（{id} 與約束代入本波實值）：
 ```
 Wave {id} 全部完成。完成標準：
 (1) 所有工作項合約指令全部跑過，輸出貼在 wave-{id}.md 對應合約結果欄
 (2) 每項覆蓋 happy path + edge case + 誤用場景 + 適用的資料守恆/規模場景（合約內列的全部跑過）
-(3) 品質閘門通過：🔒 安全 skill 0 high/critical；專案 gate（quality-gates.md 有列者）全 PASS；🎨 UX 審計已執行並記錄，或依降級規則標「待 UX 補跑」封鎖閘門
+(3) 品質閘門通過：🔒 安全 skill 0 high/critical；專案 gate script（scripts/hooks/wave-gate.sh 存在時）exit 0；🎨 UX 審計已執行並記錄，或依降級規則標「待 UX 補跑」封鎖閘門
 (4) requirements 對應項狀態已更新
 (5) wave-{id}.md「📋 延後決策」區已填寫（列出 grill 產出的所有未落地決策 + 優先順序；零延後明確寫零）
 (6) wave-{id}.md 狀態更新為「✅ 完成」
@@ -179,18 +105,6 @@ Wave {id} 全部完成。完成標準：
 約束：不動其他波正在處理的檔案（[列出其他波 ID: 涉及檔案]）。不碰其他 wave-*.md。
 合約輸出必須是本輪實際跑出的，不可憑記憶填。
 ```
-
-**mode = general：**
-```
-Wave {id} 全部完成。完成標準：
-(1) 所有工作項 checklist 全勾 ✅，產出物已建立
-(2) requirements 對應項狀態已更新
-(3) wave-{id}.md 狀態更新為「✅ 完成」
-(4) 輕量稽核 subagent 已核對產出物存在/結構/內容，結果貼在 wave-{id}.md
-約束：[同現有多波約束]
-```
-
-**mode = patch：** 同 dev 模式八條，無例外。（patch 與 dev 的唯一差異是輸入來源，驗證標準完全相同。）
 
 ## 啟動宣告模板
 
