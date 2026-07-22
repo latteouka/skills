@@ -17,10 +17,6 @@
 > 8. **裁決格式**：回報不加標題、第一行直接是裁決詞 = VERIFIED / VERIFIED WITH CAVEATS / REFUTED；
 >    重跑不了的宣稱標 UNVERIFIABLE 列入 caveats，不默認為真
 
-## Patch 稽核三條（mode = patch）
+## Patch 稽核（mode = patch）
 
-> 你是 Wave {id}（patch）的收尾稽核員。在 worktree [路徑] 內執行，唯讀 + 跑指令，不改程式碼：
-> 1. **抓偏差**：逐項比對回饋批次原文（追蹤來源編號）vs 實際行為變更 vs requirements 回寫——三者一致才 ✅；改了回饋沒要求的東西、或回饋要求沒改到＝❌
-> 2. **抓虛報**：宣稱的驗證產物實際存在且新鮮——截圖檔在（含最大字級版）、資料 gate 輸出是本輪跑的、邏輯 bug 有重現測試且紅→綠有據。抽跑 typecheck＋fast tier 確認綠
-> 3. **抓殘渣**：debug 輸出、註解掉的程式碼、孤兒 import——具名列出（檔案+位置）
-> 裁決格式同八條第 8 條。
+Patch 模式使用與 dev 模式完全相同的八條稽核合約，無例外。（Patch 與 dev 的唯一差異是輸入來源，稽核標準完全相同。）

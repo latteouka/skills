@@ -1,6 +1,6 @@
 ---
 name: wave
-description: 規劃並啟動一波工作。自動偵測開發/通用模式，讀 requirements → 偵測是否需要 align 新素材 → 規劃工作項 + 驗證合約 → 產出 living dashboard + goal condition → 選執行方式後原地開工。所有工作項一律 Claude 自主完成 + 自驗，不設「待人測」分類。所有 wave 一律在獨立 worktree 中執行。觸發詞：/wave、開新波、新一波、plan wave、啟動開發、啟動工作。子指令：/wave status（全局概覽）、/wave drop {id}（放棄一波）。旗標：--dev（強制開發模式）、--general（強制通用模式）、--patch（迭代輕快通道：回饋批次小修專用）。
+description: 規劃並啟動一波工作。自動偵測開發/通用模式，讀 requirements → 偵測是否需要 align 新素材 → 規劃工作項 + 驗證合約 → 產出 living dashboard + goal condition → 選執行方式後原地開工。所有工作項一律 Claude 自主完成 + 自驗，不設「待人測」分類。所有 wave 一律在獨立 worktree 中執行。觸發詞：/wave、開新波、新一波、plan wave、啟動開發、啟動工作。子指令：/wave status（全局概覽）、/wave drop {id}（放棄一波）。旗標：--dev（強制開發模式）、--general（強制通用模式）、--patch（回饋批次：輸入來源改用 triage 結果，驗證標準同 dev）。
 argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方向"
 ---
 
@@ -57,7 +57,7 @@ ls -d src/ lib/ app/ 2>/dev/null
 - **命中任一** → `mode = dev`，走完整開發流程（驗證合約 + 安全/UX 閘門）
 - **全未命中** → `mode = general`，走輕量流程（checklist review）
 - 使用者可覆寫：`/wave --dev` 強制開發模式、`/wave --general` 強制通用模式、`/wave --patch` 迭代輕快通道
-- **patch 自動建議**：dev 專案且工作項全部來自回饋批次（驗收台 issue、LINE 回報、bug 清單 triage 結果）、無新模組、無 schema 變更、無架構決策 → Phase 4 建議改走 `mode = patch`（見「mode = patch（迭代輕快通道）」節），使用者確認才切
+- **patch 自動建議**：dev 專案且工作項全部來自回饋批次（驗收台 issue、LINE 回報、bug 清單 triage 結果）、無新模組、無 schema 變更、無架構決策 → Phase 4 建議改走 `mode = patch`（見「mode = patch（迭代輕快通道）」節），使用者確認才切。**patch 與 dev 的唯一差異是輸入來源（Phase 2 掃描改用 triage 結果），驗證/稽核/閘門標準完全相同**
 
 偵測邏輯寬鬆——寧可多判成 dev 也不要漏。偵測結果在 Phase 4 向使用者顯示，使用者可當場改。
 
@@ -246,30 +246,13 @@ git log --oneline -20
 
 #### mode = patch（迭代輕快通道）
 
-> 適用：迭代/驗收期的回饋批次——工作項全部是小修（bug fix、文案、版面、呈現規則調整），無新模組、無 schema 變更、無架構決策。任一項不符 → 該項抽出走 dev 模式合約（或整波升級 dev）。**未列差異者一律照 dev 模式執行。**
+> 適用：迭代/驗收期的回饋批次——工作項全部是小修（bug fix、文案、版面、呈現規則調整），無新模組、無 schema 變更、無架構決策。任一項不符 → 該項抽出走 dev 模式合約（或整波升級 dev）。
 
-**規劃期（省）：**
+**與 dev 模式的唯一差異——輸入來源：**
 - Phase 2 四來源掃描跳過——工作清單＝回饋批次的 triage 結果（驗收台 issue、LINE 回報清單），逐項帶追蹤來源編號
-- Phase 2.5 的 `/grill-me` **照全域規則無條件執行**（聚焦快收斂版：共識矛盾項、範圍認定、優先序、模糊意圖）；僅 brainstorming 加碼判斷不觸發。與 CONTEXT.md／requirements 矛盾的項在 grill 中裁定，不默默改
-- 驗證合約改輕量三型（不寫五角度覆蓋場景）：
+- Phase 2.5 的 `/grill-me` 照全域規則無條件執行（聚焦快收斂版：共識矛盾項、範圍認定、優先序、模糊意圖）；與 CONTEXT.md／requirements 矛盾的項在 grill 中裁定，不默默改
 
-| 工作項型 | 驗證方式 |
-|---|---|
-| UI 呈現／版面 | 截圖驗證：預設＋最大字級各一張、空資料態；**不寫 unit test** |
-| 資料呈現／欄位對應 | 專案資料 gate 加一條防回歸（quality-gates.md 有列者，如品質檢查 YAML），跑過貼輸出 |
-| 邏輯 bug | 維持 TDD：先寫重現測試再修＋TWINS 孿生掃描（護欄不縮水） |
-
-- 🔒 安全 skill：只有動到 API／auth／權限的項逐項跑；其餘改為全批收尾統一跑一次 semgrep baseline
-
-**執行期（省）：**
-- E2E 責任制縮為：blocking smoke 三斷言（照舊必跑）＋截圖自檢；**純呈現層調整不要求新寫 E2E spec**
-- 三鏡頭抗辯／advisor 諮詢點 1、4 不觸發（bug 根因判定仍照「重大結論抗辯」既有觸發條件）
-- Ledger 照記（中斷恢復仍靠它）
-
-**收尾（省）：**
-- 品質閘門＝typecheck＋fast tier 測試＋資料 gate（有鉤子檔時）＋**改動 view 截圖牆一輪**（預設＋最大字級）
-- 收尾稽核改「patch 稽核三條」（見 `references/audit-contract.md`）——稽核行為與回饋原意/requirements 一致、驗證產物真偽、殘渣；**不稽核措辭／命名／JSDoc 一致性**
-- Goal condition 四條：照 `references/templates.md`「Goal Condition 模板」節 patch 段填入
+**其餘一切照 dev 模式執行，無例外：** 驗證合約五角度覆蓋場景、REUSE 行、TWINS 行、INTENT 三方對齊、安全 🔒 步驟、E2E 責任制（含完整 spec 不只 smoke）、三鏡頭抗辯、advisor 四諮詢點、品質閘門全套、收尾稽核全套、Goal condition 八條。不因「只是小修」降級任何規則。
 
 #### mode = general
 

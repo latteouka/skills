@@ -190,14 +190,7 @@ Wave {id} 全部完成。完成標準：
 約束：[同現有多波約束]
 ```
 
-**mode = patch：**
-```
-Wave {id}（patch）完成。完成標準：
-(1) 回饋批次全項處理完或標記不修理由（含追蹤來源編號對應）
-(2) typecheck + fast tier + 資料 gate 綠，輸出貼 wave-{id}.md
-(3) 改動 view 截圖牆存在且已自檢（預設＋最大字級）
-(4) requirements 對應項已回寫；wave-{id}.md 標 ✅（patch 稽核三條通過）
-```
+**mode = patch：** 同 dev 模式八條，無例外。（patch 與 dev 的唯一差異是輸入來源，驗證標準完全相同。）
 
 ## 啟動宣告模板
 
