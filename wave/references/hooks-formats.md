@@ -4,6 +4,8 @@
 
 ## quality-gates.md 格式範本
 
+（表內指令皆為範例，建檔時替換為專案自有指令）
+
 ```markdown
 # Quality Gates — [專案名]
 
