@@ -182,28 +182,13 @@ git log --oneline -20
 
 **交集分析（多波時）：** 如果 Phase 0 偵測到其他進行中的波，跑 `bash <kit>/scripts/wave-registry.sh intersect`——它對每對活躍 worktree 以 `git diff --name-only <base>...HEAD` 算實際改動交集，並用 merge-tree 預演分級（可自動合併／需裁定）。本波尚未建 worktree 時，把本波工作項預期動到的檔案與 `intersect` 列出的他波改動集人工對照。結果記錄下來，Phase 4 顯示預警。
 
-### Phase 2.5: 無條件 grill-me ＋ 判斷是否加碼 brainstorming
+### Phase 2.5: 判斷是否需要訪談（grill / brainstorming）
 
-> **CRITICAL: 每一波掃完工作項後一律執行 `/grill-me`，無例外、無自我豁免。**「全部都是明確 bug fix」不是跳過理由——跳過訪談的波最常做出「做完了但不是使用者要的」的東西。
+需要才訪談，自己判斷。典型的「需要」：新功能或從零開始的模組、多個有效做法／架構或 UX 決策待選、與既有共識矛盾的項、模糊描述猜不準真實意圖、掃出的 ❓ 未決項。明確 bug fix 批次通常直接進 Phase 3。
 
-**Grill 的聚焦（依波型調整深度，不調整有無）：**
-- 新功能／架構波 → 完整壓力測試（方案、邊界、風險、驗收標準）
-- 回饋批次（`--from`）波 → 聚焦快收斂：與既有共識矛盾的項、範圍認定（哪些不修＋理由）、優先序、模糊描述的真實意圖——通常數題即收斂，不拖長
-- 掃出的每個 ❓ 未決項都是現成的 grill 題目
-
-**加碼判斷（grill 之外是否還需要展開設計）：**
-
-| 情境 | 觸發 | 理由 |
-|---|---|---|
-| 工作項包含**新功能或從零開始的模組** | `/brainstorming` | 設計方向未定，需要探索多方案再選 |
-| 工作項包含**多個有效做法、架構選擇、或 UX 決策** | `/brainstorming` | 先展開 trade-off 再寫合約，避免合約鎖死錯誤方向 |
-| 工作項含**碎片化統一**（Phase 2 審計已觸發） | `/brainstorming` 直接呈現淺/中/深光譜（`references/ui-fragmentation-audit.md`） | scope 決策總落在同一光譜；預設推薦淺層 |
-| 工作項牽涉到**既有文件需同步更新**（CONTEXT.md / ADR） | 以 `/grill-with-docs` 取代 `/grill-me` | 訪談同時更新文件，避免計畫和文件脫節 |
-
-**執行方式：**
-- 需要 brainstorming 時，先 brainstorming（展開方向）再 grill（壓力測試）
+- 方向未定 → `/brainstorming`（先展開再收斂）；已有方案要壓力測試 → `/grill-me`；牽涉 CONTEXT.md／ADR 同步 → `/grill-with-docs`。需要 brainstorming 時先 brainstorming 再 grill
+- 碎片化統一項（Phase 2 審計已觸發）→ `/brainstorming` 直接呈現淺/中/深光譜（`references/ui-fragmentation-audit.md`），預設推薦淺層
 - 完成後帶著結論進 Phase 3，結論直接影響合約的覆蓋場景設計
-- 向使用者說明本波 grill 的聚焦點：「這波是回饋批次，grill 聚焦 3 個與共識矛盾項＋範圍認定。」
 
 ### Phase 3: 分類、排序、寫驗證合約
 
@@ -247,7 +232,7 @@ git log --oneline -20
 
 排序原則：先做有測試可驗的後端邏輯 → 再做 Playwright 可驗的 UI 功能 → 依賴關係決定其餘順序。
 
-#### Grill/Spec 決策審計（每波必做——grill 已無條件執行）
+#### Grill/Spec 決策審計（有訪談產出時必做）
 
 > **CRITICAL: 分類完工作項後，必須回頭比對 grill/brainstorming 產出的所有決策。沒有對應工作項的決策必須明確落到收件匣，不得消失在對話裡。**
 
@@ -689,7 +674,7 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
    - **核對 (8) 不可單勾**：必須在 🎯 區塊 (8) 下方列出本波實際發生的所有停點（時點 + 原因），逐一對照「停點規則」合法清單；單句斷言（「全程僅兩停點」）不算核對。有任何一次停點不在合法清單 → (8) 不可勾，如實記錄違規
    - **Advisor 終檢**（工具可用時）：打勾前執行「Advisor 諮詢協議」諮詢點 4，結果記 ledger；advisor 點出實質遺漏 → 處理完才標「✅ 完成」
    - **消化掉的 backlog 項改為 `done:{wave-id}`**
-4. **未涵蓋事項揭露**（每波必做——grill 已無條件執行）：
+4. **未涵蓋事項揭露**（每波必做）：
    - 讀取本波期間 append 到 `.claude/dev/inbox.md` 的項目（`from: grill:*` 與執行中冒出的）
    - 在完成報告中**醒目列出**，每筆一行：內容 ＋ 為何本波不做
    - 零項時明確寫：「✅ 本波涵蓋所有 grill/spec 決策，執行中無新增未處理事項。」
