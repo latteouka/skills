@@ -6,6 +6,10 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 
 # Wave — 開發波次規劃與啟動
 
+> **本版為精簡實驗版（2026-07-25）**：拿掉五角度合約強制清單、REUSE/TWINS/INTENT/AUTH 強制標記、
+> 無條件 grill、E2E 七步強制清單（各自的 commit 有完整說明），測試 Opus 5 自行推進工作的能力。
+> 完整版見 git 歷史 `f5a302e`（`git show f5a302e:wave/SKILL.md`）。品質下降即還原。
+
 一次呼叫完成：對齊新資訊 → 規劃工作項 → 產出可直接貼入的 session prompt + goal condition。
 
 **Wave 是純開發引擎。** 非開發批次工作（文件整理、信件處理等）不用 wave，回歸普通 session＋todo——那些工作不需要 worktree／驗證合約／goal condition 這套重裝備。
