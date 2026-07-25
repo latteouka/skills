@@ -6,15 +6,46 @@ kit_repo_root() {
     git rev-parse --show-toplevel 2>/dev/null
 }
 
+# _kit_unquote_value <raw>
+# 內部共用函式：對「key: value」的 value 部分去行內註解＋去頭尾成對引號。
+# 供 kit_config_get / kit_fm_get 共用，避免同一個 sed idiom 各複製一份、
+# 修一次漏一處（2026-07-25 行內註解 bug 的根因就是這段邏輯散在兩處各自實作）。
+#
+# 規則（對齊 YAML 語意）：
+#   - value 若以引號開頭（單/雙皆可），取到「下一個同款引號」為止，引號內的
+#     空白與 # 一律視為值的一部分，不當註解處理（不然帶空格的指令字串會被截斷）。
+#   - value 未加引號時，`#` 前面需緊接空白（或整段即以 # 開頭）才視為註解起點；
+#     沒有前置空白的 # 是值本身的一部分（YAML 規範如此，如 `foo#bar` 整串是值）。
+#   - 去註解必須先做，再去尾空白（去註解會在值尾端留下原本註解前的空白）。
+_kit_unquote_value() {
+    local raw="$1" val
+    case "$raw" in
+        \"*)
+            val="${raw#\"}"
+            val="${val%%\"*}"
+            ;;
+        \'*)
+            val="${raw#\'}"
+            val="${val%%\'*}"
+            ;;
+        *)
+            val="$(printf '%s\n' "$raw" | sed 's/^#.*$//; s/[[:blank:]]#.*$//')"
+            val="$(printf '%s\n' "$val" | sed 's/[[:space:]]*$//')"
+            ;;
+    esac
+    printf '%s' "$val"
+}
+
 # kit_config_get <key> <default>
 # 讀 <repo>/.claude/dev/intake.config.yaml 的 top-level key。
-# 只支援 `key: value` 平鋪格式（本 kit 的 config 刻意保持平鋪）。
+# 只支援 `key: value` 平鋪格式（本 kit 的 config 刻意保持平鋪），支援行內註解與引號值。
 kit_config_get() {
-    local key="$1" default="${2:-}" root cfg val
+    local key="$1" default="${2:-}" root cfg raw val
     root="$(kit_repo_root)" || { printf '%s' "$default"; return 0; }
     cfg="${root}/.claude/dev/intake.config.yaml"
     [ -f "$cfg" ] || { printf '%s' "$default"; return 0; }
-    val="$(sed -n "s/^${key}:[[:space:]]*//p" "$cfg" | sed -n '1p' | sed 's/[[:space:]]*$//')"
+    raw="$(sed -n "s/^${key}:[[:space:]]*//p" "$cfg" | sed -n '1p')"
+    val="$(_kit_unquote_value "$raw")"
     [ -n "$val" ] || val="$default"
     printf '%s' "$val"
 }
@@ -22,18 +53,19 @@ kit_config_get() {
 # kit_fm_get <file> <key>
 # 讀 YAML frontmatter（首行必須是 --- ，到下一個 --- 為止）的欄位。
 # 必須有成對的 --- （開頭與結尾）才解析；否則回空字串，絕不誤讀內文。
+# 同 kit_config_get，支援行內註解與引號值（見 _kit_unquote_value）。
 kit_fm_get() {
-    local file="$1" key="$2" first has_closing
+    local file="$1" key="$2" first has_closing raw
     [ -f "$file" ] || return 0
     first="$(sed -n '1p' "$file")"
     [ "$first" = "---" ] || return 0
     # 確認真的有結尾的 ---（不只開頭）
     has_closing="$(sed -n '2,$p' "$file" | grep -n '^---$' | head -1)"
     [ -n "$has_closing" ] || return 0
-    sed -n '2,/^---$/p' "$file" \
+    raw="$(sed -n '2,/^---$/p' "$file" \
         | sed -n "s/^${key}:[[:space:]]*//p" \
-        | sed -n '1p' \
-        | sed 's/[[:space:]]*$//'
+        | sed -n '1p')"
+    _kit_unquote_value "$raw"
 }
 
 # kit_next_id <file> <prefix>

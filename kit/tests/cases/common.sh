@@ -15,6 +15,39 @@ assert_eq "15" "$(cd "$SANDBOX" && kit_config_get hot_zone_limit 20)" "config �
 assert_eq "docs/rtm/matrix/" "$(cd "$SANDBOX" && kit_config_get spec_layer '')" "config 讀路徑值"
 assert_eq "" "$(cd "$SANDBOX" && kit_config_get not_there '')" "config 缺 key 回 default"
 
+# --- kit_config_get：真實 template（templates/intake.config.yaml，每行帶行內註解）
+# 不可自己造一份乾淨版本當 fixture——這正是 2026-07-25 那次 bug 漏測的根因：
+# 舊 fixture 是乾淨版，測不出行內註解會把整串（含註解）讀進來的問題。
+cp "$KIT_ROOT/templates/intake.config.yaml" "$SANDBOX/.claude/dev/intake.config.yaml"
+assert_eq "20" "$(cd "$SANDBOX" && kit_config_get hot_zone_limit 999)" "真實 template：hot_zone_limit 去除行內註解"
+assert_eq "8" "$(cd "$SANDBOX" && kit_config_get inbox_alert 999)" "真實 template：inbox_alert 去除行內註解"
+assert_eq "60" "$(cd "$SANDBOX" && kit_config_get stale_days 999)" "真實 template：stale_days 去除行內註解"
+assert_eq "7" "$(cd "$SANDBOX" && kit_config_get archive_after_days 999)" "真實 template：archive_after_days 去除行內註解"
+assert_eq ".claude/dev/archive" "$(cd "$SANDBOX" && kit_config_get archive_root '.claude/dev/archive')" "真實 template：archive_root 無註解正常讀值"
+assert_eq "X" "$(cd "$SANDBOX" && kit_config_get spec_layer 'X')" "真實 template：spec_layer 空引號值去引號後為空,回 default（不可殘留字面 \"\"）"
+assert_eq "X" "$(cd "$SANDBOX" && kit_config_get spec_check 'X')" "真實 template：spec_check 空引號值去引號後為空,回 default（不可殘留字面 \"\"）"
+
+# --- kit_config_get：引號值（installer 填入後的狀態）不可被行內註解截斷，
+# 引號內含空白的值（如指令字串）也不可被誤截。
+cat > "$SANDBOX/.claude/dev/intake.config.yaml" <<'EOF'
+spec_layer: "docs/rtm/matrix/"
+spec_check: "pnpm tsx scripts/rtm-check.ts"   # 用來對帳 spec
+EOF
+assert_eq "docs/rtm/matrix/" "$(cd "$SANDBOX" && kit_config_get spec_layer '')" "引號值去引號"
+assert_eq "pnpm tsx scripts/rtm-check.ts" "$(cd "$SANDBOX" && kit_config_get spec_check '')" "引號值含空格＋行內註解不被截斷"
+
+# --- kit_fm_get：frontmatter 值同樣要能去行內註解與引號（同一套邏輯共用）
+cat > "$SANDBOX/w-comment.md" <<'EOF'
+---
+wave_id: map-v2   # 內部代號
+status: done
+closed: "2026-07-16"
+---
+# 內文
+EOF
+assert_eq "map-v2" "$(kit_fm_get "$SANDBOX/w-comment.md" wave_id)" "frontmatter 行內註解不污染值"
+assert_eq "2026-07-16" "$(kit_fm_get "$SANDBOX/w-comment.md" closed)" "frontmatter 引號值去引號"
+
 # --- kit_fm_get：解析 frontmatter
 cat > "$SANDBOX/w.md" <<'EOF'
 ---
