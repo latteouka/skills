@@ -35,17 +35,19 @@ grep -rn "<關鍵詞>" <spec_layer>
 
 ## 4. 分流判定（flow 欄位）
 
-**先判規模——以下任一成立即 `flow: spec`，與 type 無關：**
+**以下任一成立即 `flow: spec`，與 type、status 皆無關：**
 - 預估動 4 個以上檔案
 - 含架構或資料模型決策
-- 需新增 matrix 條目
-- 需客戶確認（含所有 `status: ⚠️需客戶確認` 的項）
 - 跨模組
 
 **以上皆不成立 → `flow: direct`。**
 
-type 與 flow 正交：一個 BUG 若要動 5 個檔並改資料模型，仍是 `flow: spec`；
-一個 NEW 若只加一個小欄位，仍是 `flow: direct`。
+三個欄位正交，不可互相推導：
+- `type` 決定規格層影響（是否動 matrix），不決定 flow
+- `status` 決定能否排波（`⚠️需客戶確認` 的項 wave 取不到），不決定 flow
+- `flow` 只衡量工作量規模
+
+例：一個 SPEC_CHANGE 若只改一個預設值，是 `type: SPEC_CHANGE`＋`status: ⚠️需客戶確認`＋`flow: direct` ——客戶確認過後直接進 wave 做掉，不需要寫 spec。一個 BUG 若要動 5 個檔並改資料模型，是 `type: BUG`＋`flow: spec`。
 
 `flow: direct` 的工作項**不需要**先走 brainstorming。這不是在合理化跳過流程——分流判定已在 triage 階段完成，重複 brainstorming 只會產生無人閱讀的 spec 並加劇文件堆積。
 
