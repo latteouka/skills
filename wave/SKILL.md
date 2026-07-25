@@ -1,6 +1,6 @@
 ---
 name: wave
-description: 規劃並啟動一波開發波次（純開發引擎）。適用於：開始一輪多工作項的開發、從 requirements 或回饋批次排工作、查看或放棄進行中的波。觸發詞：/wave、開新波、新一波、plan wave、啟動開發；子指令 /wave status、/wave drop {id}；參數 --from <來源>（用法見本文）。
+description: 規劃並啟動一波開發波次（純開發引擎）。適用於：開始一輪多工作項的開發、從 requirements 或回饋批次排工作、查看或放棄進行中的波。觸發詞：/wave、開新波、新一波、plan wave、啟動開發；子指令 /wave status、/wave drop {id}。
 argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方向"
 ---
 
@@ -16,7 +16,7 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 - **一波帶走。** 所有掃出的未完成項都排進這一波，不建議延後。遇到真正的 blocker 在該項旁邊標註原因讓使用者決定，但不主動歸類為「建議延後」。
 - **唯一停點制。** 全流程僅兩個合法停點，其餘階段轉換與項間一律自動接續——不停、不問、不結束 turn。詳見「停點規則」。
 - **品質不入 skill。** Wave 對「收尾品質」唯一認識的概念＝專案 gate script（`scripts/hooks/wave-gate.sh`）的 exit code。任何新的品質檢查需求一律寫進專案的 gate script／hook／lint，不得加進本 skill 的流程條文——skill checklist 是規則的暫存區，機器化後即刪。
-- **零模式判斷。** 本 skill 無模式偵測、無模式分支——LLM 的模式判斷是 drift 源。輸入來源用 `--from` 參數由使用者明示，管線永遠同一條。
+- **零模式判斷。** 本 skill 無模式偵測、無模式分支——LLM 的模式判斷是 drift 源。輸入來源固定為 Phase 2 四來源掃描（backlog 即來源 1），管線永遠同一條。
 
 ## 停點規則（唯一停點制）
 
@@ -129,7 +129,7 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 
 > 掃描必須在 Align（Phase 0 Step 3 / Phase 1）**之後**執行——新素材要先落檔 requirements 才掃得到，順序顛倒會掃到舊狀態。Phase 0 不預跑掃描。
 
-**`--from <來源>` 參數（回饋批次）：** 使用者以 `/wave --from` 指定輸入來源（驗收台 issue、LINE 回報、bug 清單等 triage 結果）時，本 Phase 的來源 1/2/4 掃描改為「指定來源清單逐項帶追蹤來源編號」，來源 3（收件匣未整理項，觸發 inbox→backlog 自動 triage）照掃。**其餘管線完全相同**——驗證合約、🔒 安全步驟、品質閘門、收尾稽核、goal condition 全部照走，不因「只是小修」降級任何規則。與 CONTEXT.md／requirements 矛盾的項先與使用者裁定，不默默改。
+**回饋批次不降級：** 不論工作項來自哪個來源（backlog、驗收台 issue、LINE 回報、bug 清單），管線完全相同——驗證合約、🔒 安全步驟、品質閘門、收尾稽核、goal condition 全部照走，不因「只是小修」降級任何規則。與 CONTEXT.md／requirements 矛盾的項先與使用者裁定，不默默改。
 
 > **CRITICAL: 掃描完備優先於掃描速度。四個來源各掃一輪後再掃一輪，連續兩輪無新工作項才准停。防「掃到夠交差就停」。**
 
