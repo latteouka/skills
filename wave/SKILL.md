@@ -259,7 +259,7 @@ git log --oneline -20
 | 新頁面 / 新流程 / 新 layout | `/nielsen-heuristics-audit` |
 | 整頁重設計 / 大量 UX 改版 | `/ux-audit-rethink` |
 
-> `/ui-test` 不再對「任何前端工作項」必推——blocking 級把關已由每個 UI 項合約內建的 smoke 三斷言承擔（見「E2E 驗證責任制」）。ui-test 的定位是探索性掃描，只在新增大量 UI 面時值得跑；一般修改波不排它，跳過不需寫理由。
+> `/ui-test` 不再對「任何前端工作項」必推——blocking 級把關已由 UI 項的 Playwright 自驗承擔（見「E2E 驗證責任制」）。ui-test 的定位是探索性掃描，只在新增大量 UI 面時值得跑；一般修改波不排它，跳過不需寫理由。
 
 **檔案交集預警（多波時）：** 只在**規劃階段**（本 Phase）顯示一次。以 `bash <kit>/scripts/wave-registry.sh intersect` 的輸出為準——只列它標「⚠️ 需裁定」的檔（exit 1 ＝ 有需裁定交集），標「可自動合併」的不列：
 
@@ -607,16 +607,9 @@ Subagent 回傳異常（0 tool uses、秒級返回、無 commit）→ 視為沒�
 
 ### E2E 驗證責任制
 
-> **CRITICAL: 所有 UI 工作項 Claude 必須用 Playwright 驗到底。沒有「交人測」這個出口。驗資料正確，也驗流程順暢。**
+> **CRITICAL: 所有 UI 工作項 Claude 必須用 Playwright 驗到底。沒有「交人測」這個出口。**
 
-每個有 UI 的工作項實作完：
-1. **Blocking smoke 三斷言（固定必含、不可標 advisory）** — 對改動的每個 view：①開頁 console 0 error ②主要輸入欄位可實際輸入（type 後斷言值存在）③主要 CTA 可點擊且有反應。這三條專攔「無法輸入／crash loop／按了沒反應」級 regression——歷史上漏到客戶端的 blocking bug 都是這級
-2. **寫 E2E 測試**覆蓋完整操作流程（導航→操作→結果斷言）
-3. **資料正確性** — 斷言 API 回傳、DB 寫入、頁面顯示的資料一致
-4. **流程順暢性** — 斷言操作流程連貫：頁面跳轉正確、loading 狀態出現→消失、toast/feedback 即時顯示、表單提交後正確導向下一步
-5. **跑 E2E 直到綠燈** — 測試失敗代表功能有 bug，修到過為止
-6. **截圖自檢** — Playwright 截圖確認元素存在、佈局不破版
-7. **全過才 commit**
+驗什麼、驗多深自己判斷（歷史教訓供參：漏到客戶端的 blocking bug 都是「無法輸入／crash loop／按了沒反應」這級，開頁 console、輸入欄、主要 CTA 值得優先驗）。測試失敗代表功能有 bug，修到過為止；全過才 commit。
 
 E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 spec 白名單）由專案 gate 管（如 pre-push 白名單擋非驗收 spec）——wave 只管「驗到底」，不規定檔案去留。
 
