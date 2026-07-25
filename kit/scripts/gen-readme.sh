@@ -55,8 +55,9 @@ tmp="$(mktemp)"
 
     printf '\n## 歷史索引\n\n'
     if [ -f "${dev}/wave-INDEX.md" ]; then
-        # 計算 INDEX 中資料列數（利用資料行的 ~ 符號：期間格式 YYYY-MM-DD~YYYY-MM-DD）
-        count="$(grep -c '~' "${dev}/wave-INDEX.md" 2>/dev/null || echo 0)"
+        # 計算 INDEX 中資料列數（每個波必定有取回指令 `git show`）
+        # 期間欄格式多樣（YYYY~YYYY、單日期、?、unknown 等），唯一可靠依據是取回欄都有 `git show`
+        count="$(grep -c 'git show' "${dev}/wave-INDEX.md" 2>/dev/null || echo 0)"
         if [ "$count" -gt 0 ]; then
             printf '已刪除 %d 個完成的波。\n\n' "$count"
             printf '內容存於 `wave-INDEX.md`；各波取回指令已記錄在該檔案的「取回」欄。\n\n'
