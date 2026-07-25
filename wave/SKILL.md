@@ -108,12 +108,20 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 
 1. **Digest** — 讀取素材，摘出行為承諾 / 需求變更 / 新決策。素材為逐字稿檔且專案有 `.claude/dev/feature-map.md` 時，先查其 STT 勘誤表校正固定轉錯詞
 2. **Ground** — 素材為口語化描述（打字或逐字稿）且專案有 `.claude/dev/feature-map.md` 時，把每個需求 resolve 成 route＋檔案範圍；完整程序（命中驗證／fallback 探索／❓ 集中 Phase 4／靜默累積）讀 `references/hooks-formats.md`「feature-map grounding 程序」節照做
-3. **Diff** — 比對 `docs/requirements/` 現有內容，分三類：
-   - 🆕 新增（requirements 沒有的）
+3. **Diff** — 比對專案既有規格文件（如有；路徑因專案而異，未維護規格文件的專案本步全數歸類 🆕）現有內容，分三類：
+   - 🆕 新增（既有規格文件沒有的，或專案未維護規格文件）
    - ⚠️ 衝突（與現有描述矛盾）
    - ✅ 一致（已對齊）
 4. **確認衝突** — 只有 ⚠️ 項需要使用者裁定（逐條，附推薦方案）
-5. **落檔** — 更新 `docs/requirements/` 對應檔案
+5. **落檔** — 功能行為細節的落點依專案有無 intake kit 決定：
+   - 有 `.claude/dev/inbox.md`（已裝 intake kit）→ 寫成新的 `## INB-NNN` 條目 append 進 `inbox.md`
+     （`when`/`from`/`raw` 格式同既有條目，`from` 填 `逐字稿:{檔名}` 或對應素材來源），交給 Phase 2
+     「開波前自動 triage」分類
+   - 無 `.claude/dev/inbox.md`（未裝 intake kit）→ 不寫外部規格檔案：本步驟產出的行為細節直接帶入
+     Phase 2/3，成為對應工作項的描述與合約依據，隨 Phase 5 一併寫入 `wave-{id}.md`（比照『輸出 2:
+     Session Context』既有機制）。比照 Phase 2「intake kit 缺席降級」的揭露方式，ledger 記一行「本波
+     無 intake kit，Align 落檔改走 dashboard 工作項」，收尾報告品質 caveat 區列出
+   - 本條只改 wave 自身「簡化版 align」的落檔目標；CONTEXT.md／ADR 等文件同步不由此步驟涵蓋，不受影響
 
 如果沒有新素材，跳過此 Phase。
 
@@ -125,11 +133,17 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 
 > **CRITICAL: 掃描完備優先於掃描速度。四個來源各掃一輪後再掃一輪，連續兩輪無新工作項才准停。防「掃到夠交差就停」。**
 
-> **開波前自動 triage（不停、不問，不算「停點規則」新停點）：** 來源 3（收件匣未整理項）若 > 0，先讀
-> `~/projects/skills/kit/references/triage-rules.md` 全文並對 `.claude/dev/inbox.md` 執行 triage（結果寫入
-> `.claude/dev/backlog.md`），再回頭掃來源 1。此步驟與其餘來源掃描同屬 Phase 2 自動執行範圍，開波本身即
-> 代表要取料，不因此產生新的等待輸入節點。`triage-rules.md` 不存在的專案（未裝 intake kit）→ 略過本段，
-> 四來源掃描照舊執行。
+> **開波前自動 triage（不停、不問，不算「停點規則」新停點）：** 來源 3 判定為「收件匣未整理項 > 0」
+> 時（見下方 bash，`inbox.md` 存在才會進這個分支），先讀 `~/projects/skills/kit/references/triage-rules.md`
+> 全文並對 `inbox.md` 執行 triage（結果寫入 `backlog.md`），再回頭掃來源 1。此步驟與其餘來源掃描同屬
+> Phase 2 自動執行範圍，開波本身即代表要取料，不產生新的等待輸入節點。
+>
+> **intake kit 缺席降級（比照「外部 Skill 缺席降級」pattern，非靜默跳過）：** 未裝 intake kit 的專案
+> （無 `backlog.md`／`inbox.md`／`triage-rules.md`）→ 開波前自動 triage、⚠️ 硬閘門、分流三條連帶不適用
+> （沒有 backlog 就沒有 `status`／`flow` 欄位可讀）。來源 1（backlog 掃描）明確無產出——這是「未裝
+> intake kit」，不是「掃不到所以沒有待辦」；來源 3 自動退回掃舊 wave 的「📋 延後決策」（wave 原生格式，
+> 不依賴 intake kit，見下方 bash）。ledger 記一行「無 intake kit，來源 1 無產出、來源 3 走 fallback」；
+> 收尾報告品質 caveat 區列出。
 >
 > **⚠️ 硬閘門：** `status: ⚠️需客戶確認` 的 backlog 項不得取用排波，即使使用者說「全部做完」。該項需
 > 人工改為 `ready` 或 `dropped` 才可取。
@@ -140,14 +154,19 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 自動執行（不問使用者），四個來源：
 
 ```bash
-# 來源 1：backlog 待排波項（取代已退役的 docs/requirements/）
+# 來源 1：backlog 待排波項；無 backlog.md＝該專案未裝 intake kit，本來源無產出（見上方降級揭露）
 grep -E '\| (ready) \|' .claude/dev/backlog.md 2>/dev/null
 
 # 來源 2：程式內待辦標記
 grep -rn "TODO\|FIXME" src/ lib/ app/ 2>/dev/null | head -50
 
-# 來源 3：收件匣未整理項（開波前已自動 triage 併入 backlog，見上方說明）
-grep -c '^## INB-' .claude/dev/inbox.md 2>/dev/null
+# 來源 3：收件匣未整理項；無 inbox.md（未裝 intake kit）→ 退回掃舊 wave 的延後決策
+# （-f 先判斷檔案存在，grep -c 才不會遇到「檔案不存在→空字串+exit 2」被誤讀成 0 的邊界）
+if [ -f .claude/dev/inbox.md ]; then
+  grep -c '^## INB-' .claude/dev/inbox.md
+else
+  grep -A 20 "📋 延後決策" .claude/dev/wave-*.md 2>/dev/null
+fi
 
 # 來源 4：git log 近況（找做一半的工作）
 git log --oneline -20
@@ -565,7 +584,7 @@ Subagent 回傳異常（0 tool uses、秒級返回、無 commit）→ 視為沒�
 0. **意圖三方對齊（行為變更前）** — 改動任何既有行為或測試預期之前，在合約結果欄寫一行：
    `INTENT: 現行為=X；合約/測試預期=Y；requirements 說=Z（引檔:行）`
    三者一致才動手。不一致＝發現而非障礙：權威順序為
-   **使用者原話 > docs/requirements > 驗證合約/測試 > 現行程式行為**，
+   **使用者原話 > 專案既有規格文件（如有） > 驗證合約/測試 > 現行程式行為**，
    按長跑規範第 5 條呈報，不得默默讓任一方遷就另一方。
    工作項標題（「修 X」「讓測試過」）不是意圖聲明，不改變權威順序。
 1. **跑合約指令** — 逐條執行合約裡列的指令
