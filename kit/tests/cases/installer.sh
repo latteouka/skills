@@ -69,4 +69,30 @@ assert_eq "$before" "$after" "改名目錄後重跑不重複追加 hook"
 
 rm -rf "$RENAMED"
 
+# --- [NEW] .gitignore：安裝時補上 kit 執行期檔案的忽略規則
+GI="$(kit_test_sandbox)"
+(cd "$GI" && bash "$INST" --non-interactive) >/dev/null 2>&1
+GI_CONTENT="$(cat "$GI/.gitignore" 2>/dev/null)"
+assert_contains "$GI_CONTENT" ".claude/dev/.inbox.lock/" "gitignore 含 .inbox.lock/"
+assert_contains "$GI_CONTENT" ".claude/dev/.readme-snapshot" "gitignore 含 .readme-snapshot"
+assert_contains "$GI_CONTENT" ".claude/dev/README.md" "gitignore 含衍生 README.md（不進版控）"
+
+# --- 冪等：重跑不重複追加同一行
+gi_lines_before="$(grep -c '^\.claude/dev/README\.md$' "$GI/.gitignore")"
+(cd "$GI" && bash "$INST" --non-interactive) >/dev/null 2>&1
+gi_lines_after="$(grep -c '^\.claude/dev/README\.md$' "$GI/.gitignore")"
+assert_eq "1" "$gi_lines_before" "首次安裝只寫一行 README.md 忽略規則"
+assert_eq "$gi_lines_before" "$gi_lines_after" "重跑不重複追加 gitignore 行"
+rm -rf "$GI"
+
+# --- 既有 .gitignore 內容：只補缺的行，不動既有內容、不重複已存在的行
+GI2="$(kit_test_sandbox)"
+printf '# 既有註解\nnode_modules/\n.claude/dev/.inbox.lock/\n' > "$GI2/.gitignore"
+(cd "$GI2" && bash "$INST" --non-interactive) >/dev/null 2>&1
+GI2_CONTENT="$(cat "$GI2/.gitignore")"
+assert_contains "$GI2_CONTENT" "node_modules/" "既有 .gitignore 內容保留"
+assert_eq "1" "$(grep -c '^\.claude/dev/\.inbox\.lock/$' "$GI2/.gitignore")" "既有已存在的行不重複追加"
+assert_contains "$GI2_CONTENT" ".claude/dev/README.md" "缺的行仍會補上"
+rm -rf "$GI2"
+
 rm -rf "$SANDBOX"

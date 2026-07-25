@@ -98,4 +98,34 @@ FILLER_LONG="$(printf 'y%.0s' $(seq 1 600))"
 out="$(run_capture "\"#bug 開頭有標記但後面接超長內容：${FILLER_LONG}\"")"
 assert_eq "$before_inbox" "$(cat "$INBOX")" "開頭有 #bug 但總長度過長仍不自動收錄"
 
+# --- [NEW] 多 worktree：從 worktree 內執行 capture，應寫入主 checkout 的
+# inbox，不是 worktree 自己那份副本（2026-07-25 自我審查發現：hook 用
+# kit_repo_root 在 worktree 內執行時只會拿到 worktree 自己的路徑，導致
+# 多個 worktree／主 checkout 各自累積一份 inbox，彼此分裂）。
+# 用真正的 `git worktree add` 建立 fixture（而非手造目錄），確保
+# kit_repo_root 在裡面真的會回傳 worktree 自己的 toplevel，貼近正式環境。
+WT_MAIN="$(kit_test_sandbox)"
+git -C "$WT_MAIN" config user.email t@t.t
+git -C "$WT_MAIN" config user.name t
+: > "$WT_MAIN/.claude/dev/inbox.md"
+git -C "$WT_MAIN" add -A >/dev/null 2>&1
+git -C "$WT_MAIN" commit -qm init >/dev/null 2>&1
+
+mkdir -p "$WT_MAIN/.claude/worktrees"
+git -C "$WT_MAIN" worktree add -q -b kit-test-capture-wt "$WT_MAIN/.claude/worktrees/wt-a" >/dev/null 2>&1
+
+WT_SUB="$WT_MAIN/.claude/worktrees/wt-a"
+WT_MAIN_INBOX="$WT_MAIN/.claude/dev/inbox.md"
+WT_SUB_INBOX="$WT_SUB/.claude/dev/inbox.md"
+
+printf '{"prompt":"#bug 多worktree寫入測試"}' | (cd "$WT_SUB" && bash "$HOOK") >/dev/null 2>&1
+
+assert_contains "$(cat "$WT_MAIN_INBOX" 2>/dev/null)" "多worktree寫入測試" \
+    "worktree 內觸發 capture 寫入主 checkout 的 inbox"
+assert_not_contains "$(cat "$WT_SUB_INBOX" 2>/dev/null)" "多worktree寫入測試" \
+    "worktree 自己的 inbox 副本未被寫入（避免分裂）"
+
+git -C "$WT_MAIN" worktree remove -f "$WT_MAIN/.claude/worktrees/wt-a" >/dev/null 2>&1
+rm -rf "$WT_MAIN"
+
 rm -rf "$SANDBOX"

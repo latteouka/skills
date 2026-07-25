@@ -36,6 +36,19 @@ root="$(kit_repo_root)" || exit 0
 dev="${root}/.claude/dev"
 [ -d "$dev" ] || exit 0
 
+# wave-*.md 的掃描／刪除留在「目前所在」的 checkout（worktree 或主
+# checkout）——波檔物理上就在那裡完成，git rm 也該對那個 repo 的檔案動手。
+# 但 wave-INDEX.md 是跨 worktree 共用的單一歷史，不能各自寫一份（否則各
+# worktree 各自累積、merge 時互相蓋掉對方獨有的取回紀錄；2026-07-25 實測：
+# dfaa 主 checkout + 3 worktree，wave-INDEX.md 各處 157/157/157/6 行，已
+# 分裂到無法合併）。因此 INDEX 檔本體與保護它的鎖都改落在主 checkout；
+# 若主 checkout 不可用（不存在／非 git repo／缺 .claude/dev），fail-open
+# 退回用目前 checkout 自己的 dev（維持舊行為，不中斷功能）。
+main_root="$(kit_main_repo_root)"
+[ -n "$main_root" ] || main_root="$root"
+main_dev="${main_root}/.claude/dev"
+[ -d "$main_dev" ] || { main_root="$root"; main_dev="$dev"; }
+
 after_days="$(kit_config_get archive_after_days 7)"
 case "$after_days" in ''|*[!0-9]*) after_days=7 ;; esac
 
@@ -44,7 +57,7 @@ cutoff="$(date -v-"${after_days}"d '+%Y-%m-%d' 2>/dev/null \
     || date -d "${after_days} days ago" '+%Y-%m-%d' 2>/dev/null)" || exit 0
 [ -n "$cutoff" ] || exit 0
 
-index="${dev}/wave-INDEX.md"
+index="${main_dev}/wave-INDEX.md"
 if [ ! -f "$index" ]; then
     {
         printf '# Wave 歷史索引\n\n'
@@ -54,8 +67,9 @@ if [ ! -f "$index" ]; then
     } > "$index"
 fi
 
-# 加鎖：避免並發時重複寫 INDEX / 重複刪
-lockdir="${dev}/.archive.lock"
+# 加鎖：避免並發時重複寫 INDEX / 重複刪（鎖落在主 checkout，跨 worktree
+# 同時觸發 Stop hook 時也能正確互斥，不會兩邊同時搶寫同一份 INDEX）
+lockdir="${main_dev}/.archive.lock"
 if ! kit_lock_acquire "$lockdir"; then
     exit 0
 fi

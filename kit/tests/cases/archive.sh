@@ -480,3 +480,46 @@ assert_eq "1" "$([ -f "$DEV_DIRTY/wave-dirty.md" ] && echo 1 || echo 0)" "C1③�
 assert_contains "$(cat "$DEV_DIRTY/wave-dirty.md" 2>/dev/null)" "未提交的補充內容" "C1③：未提交的內容仍完整保留在工作目錄"
 assert_eq "0" "$(grep -c '| dirty |' "$DEV_DIRTY/wave-INDEX.md" 2>/dev/null)" "C1③：不寫入只能拿回舊版的 INDEX 記錄"
 rm -rf "$SANDBOX_DIRTY"
+
+# --- [NEW] 多 worktree：波檔在 worktree 完成，掃描／刪除仍在 worktree 執行
+# （檔案物理上就在那裡），但 wave-INDEX.md 的記錄必須寫進主 checkout——
+# 否則每個 worktree 各自累積一份歷史，merge 時互相蓋掉（2026-07-25 自我
+# 審查發現：dfaa 主 checkout + 3 worktree 實測 157/157/157/6 行，已分裂）。
+WTA_MAIN="$(kit_test_sandbox)"
+git -C "$WTA_MAIN" config user.email t@t.t
+git -C "$WTA_MAIN" config user.name t
+cat > "$WTA_MAIN/.claude/dev/intake.config.yaml" <<'EOF'
+archive_after_days: 7
+EOF
+git -C "$WTA_MAIN" add -A >/dev/null 2>&1
+git -C "$WTA_MAIN" commit -qm init >/dev/null 2>&1
+
+mkdir -p "$WTA_MAIN/.claude/worktrees"
+git -C "$WTA_MAIN" worktree add -q -b kit-test-archive-wt "$WTA_MAIN/.claude/worktrees/wt-b" >/dev/null 2>&1
+WTA_SUB="$WTA_MAIN/.claude/worktrees/wt-b"
+WTA_SUB_DEV="$WTA_SUB/.claude/dev"
+
+OLD_WT="$(date -v-30d '+%Y-%m-%d' 2>/dev/null || date -d '30 days ago' '+%Y-%m-%d')"
+cat > "$WTA_SUB_DEV/wave-wtdone.md" <<EOF
+---
+wave_id: wtdone
+status: done
+closed: $OLD_WT
+---
+# worktree 完成的波
+在 worktree 裡做完的功能。
+EOF
+git -C "$WTA_SUB" add -A >/dev/null 2>&1
+git -C "$WTA_SUB" commit -qm "wave done in worktree" >/dev/null 2>&1
+
+printf '{"hook_event_name":"Stop"}' | (cd "$WTA_SUB" && bash "$HOOK") >/dev/null 2>&1
+
+assert_eq "0" "$([ -f "$WTA_SUB_DEV/wave-wtdone.md" ] && echo 1 || echo 0)" \
+    "worktree 內完成的波檔仍從 worktree 刪除（掃描/刪除留在原地）"
+assert_contains "$(cat "$WTA_MAIN/.claude/dev/wave-INDEX.md" 2>/dev/null)" "wtdone" \
+    "INDEX 記錄寫入主 checkout 的 wave-INDEX.md"
+assert_eq "0" "$(grep -c '| wtdone |' "$WTA_SUB_DEV/wave-INDEX.md" 2>/dev/null || echo 0)" \
+    "worktree 自己的 wave-INDEX.md 不重複累積這筆（單一歷史落主 checkout）"
+
+git -C "$WTA_MAIN" worktree remove -f "$WTA_MAIN/.claude/worktrees/wt-b" >/dev/null 2>&1
+rm -rf "$WTA_MAIN"

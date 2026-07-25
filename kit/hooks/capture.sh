@@ -19,7 +19,10 @@ command -v jq >/dev/null 2>&1 || exit 0
 prompt="$(printf '%s' "$payload" | jq -r '.prompt // empty' 2>/dev/null)" || exit 0
 [ -n "$prompt" ] || exit 0
 
-root="$(kit_repo_root)" || exit 0
+# inbox.md 是跨 worktree 共用的單一收件匣——多 worktree 情境下一律寫主
+# checkout，不寫目前所在 worktree 自己的副本（否則各 worktree 各自累積，
+# 彼此看不到對方回報的內容；2026-07-25 自我審查發現）。
+root="$(kit_main_repo_root)" || exit 0
 [ -n "$root" ] || exit 0
 inbox="${root}/.claude/dev/inbox.md"
 [ -f "$inbox" ] || exit 0

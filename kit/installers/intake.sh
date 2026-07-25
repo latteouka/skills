@@ -89,6 +89,41 @@ else
     created="${created} settings.json(3個hook)"
 fi
 
+# --- .gitignore：kit 執行期產物（鎖檔／快照／衍生 README）不進版控。
+# 這三者都是純衍生或純執行期狀態，不含任何原始資料：
+#   .inbox.lock/     — capture.sh 的 mkdir 鎖，執行完即釋放
+#   .readme-snapshot — gen-readme.sh 用來判斷要不要重生的快照檔
+#   README.md        — .claude/dev 的機制索引，100% 由既有檔案掃描產生
+# 多 worktree 情境下 README.md 尤其不該進版控：每個 worktree 掃描到的
+# 熱區檔案不同，各自產出的內容天生就會分歧，版控只會製造無意義的
+# merge 衝突（2026-07-25 自我審查：README.md 在 4 個 checkout 行數各異
+# 102/102/102/403，差異純粹來自掃描對象不同，沒有唯一正確版本）。
+gitignore="${root}/.gitignore"
+[ -f "$gitignore" ] || : > "$gitignore"
+
+gitignore_section_added=false
+gitignore_added=""
+gitignore_ensure_line() {
+    local line="$1"
+    grep -qxF "$line" "$gitignore" 2>/dev/null && return 0
+    if [ "$gitignore_section_added" != "true" ]; then
+        printf '\n# intake kit 執行期檔案（自動產生，非版控內容）\n' >> "$gitignore"
+        gitignore_section_added=true
+    fi
+    printf '%s\n' "$line" >> "$gitignore"
+    gitignore_added="${gitignore_added} ${line}"
+}
+
+gitignore_ensure_line ".claude/dev/.inbox.lock/"
+gitignore_ensure_line ".claude/dev/.readme-snapshot"
+gitignore_ensure_line ".claude/dev/README.md"
+
+if [ -n "$gitignore_added" ]; then
+    created="${created} .gitignore(intake執行期檔案)"
+else
+    skipped="${skipped} .gitignore(已含全部條目)"
+fi
+
 echo "✅ intake 安裝完成"
 [ -n "$created" ] && echo "  新建：${created}"
 [ -n "$skipped" ] && echo "  跳過（已存在）：${skipped}"

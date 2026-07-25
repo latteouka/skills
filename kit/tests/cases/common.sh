@@ -112,4 +112,39 @@ kit_lock_acquire "$LOCK" 2 && r3=0 || r3=1
 assert_eq "0" "$r3" "釋放後可再取"
 kit_lock_release "$LOCK"
 
+# --- [NEW] kit_main_repo_root：非 worktree 路徑原樣回傳
+assert_eq "/Users/x/projects/dfaa" "$(kit_main_repo_root "/Users/x/projects/dfaa")" \
+    "非 worktree 路徑不截斷"
+
+# --- [NEW] kit_main_repo_root：worktree 路徑截斷回主 checkout（用真實存在的
+# 目錄當 main，確保「主 checkout 存在且是 git repo」的驗證會通過）
+MAINROOT_SANDBOX="$(kit_test_sandbox)"
+mkdir -p "$MAINROOT_SANDBOX/.claude/worktrees/wt-a"
+assert_eq "$MAINROOT_SANDBOX" \
+    "$(kit_main_repo_root "$MAINROOT_SANDBOX/.claude/worktrees/wt-a")" \
+    "worktree 路徑截斷回主 checkout"
+
+# --- [NEW] kit_main_repo_root：巢狀 worktree（路徑含兩層 .claude/worktrees/）
+# 一律截到第一個（最外層）出現的位置，回真正的主 checkout
+assert_eq "$MAINROOT_SANDBOX" \
+    "$(kit_main_repo_root "$MAINROOT_SANDBOX/.claude/worktrees/wt-a/.claude/worktrees/wt-nested")" \
+    "巢狀 worktree 截到第一個 .claude/worktrees/，回最外層主 checkout"
+
+# --- [NEW] kit_main_repo_root：fail-open——算出的主 checkout 路徑不存在時，
+# 回原路徑（目前所在的 worktree），不可回空字串
+assert_eq "/no/such/main/.claude/worktrees/wt-a" \
+    "$(kit_main_repo_root "/no/such/main/.claude/worktrees/wt-a")" \
+    "主 checkout 不存在時 fail-open 回原路徑"
+
+# --- [NEW] kit_main_repo_root：fail-open——算出的路徑存在但不是 git repo 時，
+# 同樣回原路徑
+NOTGIT_SANDBOX="$(mktemp -d)"
+mkdir -p "$NOTGIT_SANDBOX/.claude/worktrees/wt-a"
+assert_eq "$NOTGIT_SANDBOX/.claude/worktrees/wt-a" \
+    "$(kit_main_repo_root "$NOTGIT_SANDBOX/.claude/worktrees/wt-a")" \
+    "主 checkout 存在但非 git repo 時 fail-open 回原路徑"
+rm -rf "$NOTGIT_SANDBOX"
+
+rm -rf "$MAINROOT_SANDBOX"
+
 rm -rf "$SANDBOX"

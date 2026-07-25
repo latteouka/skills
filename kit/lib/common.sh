@@ -6,6 +6,45 @@ kit_repo_root() {
     git rev-parse --show-toplevel 2>/dev/null
 }
 
+# kit_main_repo_root [override_root]
+# 取得「主 checkout」根目錄——多 worktree 情境下，有些產物（inbox.md、
+# wave-INDEX.md）是跨 worktree 共用的單一歷史，不該各 worktree 各寫一份
+# （否則各自累積、merge 時互相蓋掉對方獨有的紀錄；2026-07-25 實測：dfaa
+# 主 checkout + 3 個 worktree，wave-INDEX.md 各處 157/157/157/6 行，已分裂
+# 到無法合併）。
+#
+# 邏輯：先取 kit_repo_root；若該路徑含 `/.claude/worktrees/`，截斷到該段
+# 之前即為主 checkout 路徑。巢狀 worktree（路徑含多層 .claude/worktrees/）
+# 一律截到「第一個」出現的位置——bash `${var%%pattern}` 對含萬用字元的
+# pattern 本來就會匹配「最長的符合後綴」，等同於從最左邊（最外層）那個
+# `/.claude/worktrees/` 開始截，不需要額外邏輯。
+#
+# fail-open：算出的主 checkout 路徑若不存在、或不是 git repo，一律回退
+# 用原路徑（$root 本身，即目前所在的 worktree）——絕不回空字串，避免
+# 呼叫端把空字串當成「不在任何 repo 內」而整段跳過寫入。
+#
+# override_root 僅供測試注入路徑字串（避免建立真正巢狀 git worktree的
+# 複雜度）；正常呼叫不帶參數，用 kit_repo_root 即時偵測。
+kit_main_repo_root() {
+    local root="${1:-}" main
+    [ -n "$root" ] || root="$(kit_repo_root)"
+    [ -n "$root" ] || return 0
+
+    case "$root" in
+        */.claude/worktrees/*)
+            main="${root%%/.claude/worktrees/*}"
+            if [ -n "$main" ] && [ -d "$main" ] && git -C "$main" rev-parse --show-toplevel >/dev/null 2>&1; then
+                printf '%s' "$main"
+            else
+                printf '%s' "$root"
+            fi
+            ;;
+        *)
+            printf '%s' "$root"
+            ;;
+    esac
+}
+
 # _kit_unquote_value <raw>
 # 內部共用函式：對「key: value」的 value 部分去行內註解＋去頭尾成對引號。
 # 供 kit_config_get / kit_fm_get 共用，避免同一個 sed idiom 各複製一份、
