@@ -44,6 +44,29 @@ printf '{ this is not json' > "$BAD/.claude/settings.json"
 (cd "$BAD" && bash "$INST" --non-interactive) >/dev/null 2>&1 && rc=0 || rc=1
 assert_eq "1" "$rc" "壞 JSON 中止安裝"
 assert_eq "{ this is not json" "$(cat "$BAD/.claude/settings.json")" "壞 JSON 未被改動"
+# 補充驗證：壞 JSON 時不應建立 .claude/dev/ 下的檔案
+assert_eq "0" "$([ -f "$BAD/.claude/dev/inbox.md" ] && echo 1 || echo 0)" "壞 JSON 時不建 inbox.md"
+assert_eq "0" "$([ -f "$BAD/.claude/dev/backlog.md" ] && echo 1 || echo 0)" "壞 JSON 時不建 backlog.md"
+assert_eq "0" "$([ -f "$BAD/.claude/dev/intake.config.yaml" ] && echo 1 || echo 0)" "壞 JSON 時不建 config"
 rm -rf "$BAD"
+
+# --- 改名目錄情境下的冪等性：路徑改變不導致重複追加
+RENAMED="$(kit_test_sandbox)"
+mkdir -p "$RENAMED/.claude"
+# 複製 KIT_ROOT 到不同名稱的目錄
+TOOLBOX="${RENAMED}/toolbox"
+cp -r "$KIT_ROOT" "$TOOLBOX"
+chmod +x "$TOOLBOX/installers/intake.sh"
+
+# 第一次安裝
+(cd "$RENAMED" && bash "$TOOLBOX/installers/intake.sh" --non-interactive) >/dev/null 2>&1
+before="$(grep -c 'capture.sh' "$RENAMED/.claude/settings.json")"
+
+# 第二次安裝（冪等檢查）
+(cd "$RENAMED" && bash "$TOOLBOX/installers/intake.sh" --non-interactive) >/dev/null 2>&1
+after="$(grep -c 'capture.sh' "$RENAMED/.claude/settings.json")"
+assert_eq "$before" "$after" "改名目錄後重跑不重複追加 hook"
+
+rm -rf "$RENAMED"
 
 rm -rf "$SANDBOX"

@@ -18,6 +18,16 @@ if [ -z "$root" ]; then echo "錯誤：不在 git repo 內，無法安裝。"; e
 
 command -v jq >/dev/null 2>&1 || { echo "錯誤：需要 jq。"; exit 1; }
 
+# --- 前置檢查：settings.json 合法性（所有寫入前驗證）
+settings="${root}/.claude/settings.json"
+mkdir -p "${root}/.claude"
+[ -f "$settings" ] || printf '{}\n' > "$settings"
+
+if ! jq empty "$settings" >/dev/null 2>&1; then
+    echo "錯誤：${settings} 不是合法 JSON，中止安裝（未做任何寫入）。"
+    exit 1
+fi
+
 dev="${root}/.claude/dev"
 mkdir -p "$dev"
 
@@ -54,16 +64,8 @@ else
 fi
 
 # --- settings.json merge
-settings="${root}/.claude/settings.json"
-mkdir -p "${root}/.claude"
-[ -f "$settings" ] || printf '{}\n' > "$settings"
 
-if ! jq empty "$settings" >/dev/null 2>&1; then
-    echo "錯誤：${settings} 不是合法 JSON，中止安裝（未做任何寫入）。"
-    exit 1
-fi
-
-if grep -q 'kit/hooks/' "$settings" 2>/dev/null; then
+if grep -q "${KIT_ROOT}/hooks/" "$settings" 2>/dev/null; then
     skipped="${skipped} settings.json(hooks已安裝)"
 else
     cp "$settings" "${settings}.bak-$(date '+%Y%m%d%H%M%S')"
