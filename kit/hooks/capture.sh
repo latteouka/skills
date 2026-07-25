@@ -39,12 +39,21 @@ raw=""
 case "$prompt" in
     '!'*)          raw="${prompt#!}" ;;
     *'#bug'*|*'#todo'*|*'#idea'*)
-        raw="$(printf '%s' "$prompt" | sed 's/#bug//g; s/#todo//g; s/#idea//g')"
+        raw="$prompt"
         ;;
 esac
 
 if [ -n "$raw" ]; then
+    # 剝除標記（兩條分支都必須做）
+    raw="$(printf '%s' "$raw" | sed 's/#bug//g; s/#todo//g; s/#idea//g')"
+    
+    # 正規化空白：前後 trim + 將換行替換為 |
     raw="$(printf '%s' "$raw" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    raw="$(printf '%s' "$raw" | tr '\n' '|')"
+    
+    # 移除類似編號的模式（防止偽造條目劫持編號計數）
+    raw="$(printf '%s' "$raw" | sed 's/INB-[0-9][0-9]*//g')"
+    
     [ -n "$raw" ] || exit 0
 
     lockdir="${root}/.claude/dev/.inbox.lock"
@@ -62,10 +71,18 @@ if [ -n "$raw" ]; then
         printf -- '- raw: %s\n' "$raw"
     } >> "$inbox"
 
-    kit_lock_release "$lockdir"
-    trap - EXIT
-    emit_context "已自動收錄至收件匣：${id}。回覆時簡短告知使用者即可，不需重複內容。"
-    exit 0
+    # 驗證寫入是否成功
+    if grep -q "^## ${id}$" "$inbox"; then
+        kit_lock_release "$lockdir"
+        trap - EXIT
+        emit_context "已自動收錄至收件匣：${id}。回覆時簡短告知使用者即可，不需重複內容。"
+        exit 0
+    else
+        kit_lock_release "$lockdir"
+        trap - EXIT
+        emit_context "收件匣寫入失敗，本則未收錄，請檢查 .claude/dev/inbox.md 權限。"
+        exit 0
+    fi
 fi
 
 # ---- 弱信號判定 -------------------------------------------------------

@@ -43,4 +43,36 @@ out="$(printf '{"prompt":"#bug x"}' | (cd "$NONGIT" && bash "$HOOK"); echo "rc=$
 assert_contains "$out" "rc=0" "非 git 目錄 exit 0"
 rm -rf "$NONGIT"
 
+# --- [NEW] Important 1: 換行過濾——防止偽造條目與編號劫持
+# 偽造條目格式：換行 + ## 號 + 偽造欄位
+before_count="$(grep -c '^## INB-' "$INBOX" || echo 0)"
+out="$(run_capture '"#bug 正常回報\n## INB-999\n- when: 偽造\n- from: 偽造\n- raw: 偽造內容"')"
+after_count="$(grep -c '^## INB-' "$INBOX" || echo 0)"
+# 確認 ## INB- 只增加 1 行（不是 2+ 行），表示換行被正規化，未產生偽造條目
+assert_eq "1" "$((after_count - before_count))" "換行過濾防止偽造條目"
+# 確認下一個編號正確遞增（INB-005），而非跳號
+out="$(run_capture '"#bug 下一筆"')"
+assert_contains "$out" "INB-005" "編號正確遞增無跳號"
+
+# --- [NEW] Important 2: ! 前綴 + 內嵌標記都剝除
+out="$(run_capture '"!排序 #bug 有問題"')"
+inbox_raw="$(tail -1 "$INBOX")"
+assert_not_contains "$inbox_raw" "#bug" "! 前綴內嵌 #bug 需剝除"
+# 由於標記被移除留下兩個空格，這裡檢查 raw 中包含 排序 和 有問題
+assert_contains "$inbox_raw" "排序" "! 前綴剝除標記後保留主詞"
+assert_contains "$inbox_raw" "有問題" "! 前綴剝除標記後保留述詞"
+
+# --- [NEW] Important 3: 寫入失敗時不謊報成功（inbox 權限不足）
+SANDBOX_NO_PERM="$(kit_test_sandbox)"
+INBOX_NO_PERM="$SANDBOX_NO_PERM/.claude/dev/inbox.md"
+: > "$INBOX_NO_PERM"
+chmod 444 "$INBOX_NO_PERM"
+out="$(printf '{"prompt":"#bug 應該失敗"}' | (cd "$SANDBOX_NO_PERM" && bash "$HOOK"); echo "rc=$?")"
+# exit 0（fail-open）+ 訊息明確表達失敗，不含「已自動收錄」
+assert_contains "$out" "rc=0" "寫入失敗仍 exit 0"
+assert_contains "$out" "寫入失敗" "失敗訊息明確表達"
+assert_not_contains "$out" "已自動收錄" "失敗訊息不謊報成功"
+chmod 755 "$INBOX_NO_PERM"
+rm -rf "$SANDBOX_NO_PERM"
+
 rm -rf "$SANDBOX"
