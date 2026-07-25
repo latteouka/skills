@@ -21,12 +21,15 @@ kit_config_get() {
 
 # kit_fm_get <file> <key>
 # 讀 YAML frontmatter（首行必須是 --- ，到下一個 --- 為止）的欄位。
-# 無 frontmatter 時回空字串，絕不誤讀內文。
+# 必須有成對的 --- （開頭與結尾）才解析；否則回空字串，絕不誤讀內文。
 kit_fm_get() {
-    local file="$1" key="$2" first
+    local file="$1" key="$2" first has_closing
     [ -f "$file" ] || return 0
     first="$(sed -n '1p' "$file")"
     [ "$first" = "---" ] || return 0
+    # 確認真的有結尾的 ---（不只開頭）
+    has_closing="$(sed -n '2,$p' "$file" | grep -n '^---$' | head -1)"
+    [ -n "$has_closing" ] || return 0
     sed -n '2,/^---$/p' "$file" \
         | sed -n "s/^${key}:[[:space:]]*//p" \
         | sed -n '1p' \

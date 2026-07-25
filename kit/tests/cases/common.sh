@@ -33,6 +33,18 @@ assert_eq "" "$(kit_fm_get "$SANDBOX/w.md" nope)" "frontmatter 缺 key 回空"
 printf '# 只有內文\nstatus: done\n' > "$SANDBOX/plain.md"
 assert_eq "" "$(kit_fm_get "$SANDBOX/plain.md" status)" "無 frontmatter 不誤讀內文"
 
+# --- kit_fm_get：有開頭 --- 但無結尾 --- 的畸形檔案回空（不可誤讀內文）
+cat > "$SANDBOX/malformed.md" <<'EOF'
+---
+wave_id: test
+status: active
+# 內文開始（無結尾 ---）
+status: done
+closed: 2026-01-01
+EOF
+assert_eq "" "$(kit_fm_get "$SANDBOX/malformed.md" status)" "畸形 frontmatter（無結尾）不誤讀內文"
+assert_eq "" "$(kit_fm_get "$SANDBOX/malformed.md" closed)" "畸形 frontmatter（無結尾）不誤讀 closed"
+
 # --- kit_next_id：空檔從 001 起
 : > "$SANDBOX/inbox.md"
 assert_eq "INB-001" "$(kit_next_id "$SANDBOX/inbox.md" INB)" "空檔起始編號"

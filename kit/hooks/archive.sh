@@ -27,6 +27,13 @@ cutoff="$(date -v-"${after_days}"d '+%Y-%m-%d' 2>/dev/null \
     || date -d "${after_days} days ago" '+%Y-%m-%d' 2>/dev/null)" || exit 0
 [ -n "$cutoff" ] || exit 0
 
+# 取 archive_root 配置（預設 .claude/dev/archive，相對於 repo root）
+archive_root="$(kit_config_get archive_root ".claude/dev/archive")"
+case "$archive_root" in
+  /*) archive_root="$archive_root" ;;  # 絕對路徑
+  *)  archive_root="${root}/${archive_root}" ;;  # 相對於 repo root
+esac
+
 index="${dev}/wave-INDEX.md"
 if [ ! -f "$index" ]; then
     {
@@ -37,6 +44,13 @@ if [ ! -f "$index" ]; then
     } > "$index"
 fi
 
+# 加鎖：避免並發時重複寫 INDEX
+lockdir="${dev}/.archive.lock"
+if ! kit_lock_acquire "$lockdir"; then
+    exit 0
+fi
+trap "kit_lock_release '$lockdir'" EXIT
+
 moved=0
 for f in "${dev}"/wave-*.md; do
     [ -f "$f" ] || continue
@@ -44,11 +58,25 @@ for f in "${dev}"/wave-*.md; do
     case "$base" in wave-INDEX.md) continue ;; esac
     case "$base" in *-ledger.md) continue ;; esac   # ledger 隨其 dashboard 一起搬
 
+    # 驗證該檔有合法的 frontmatter（成對 --- ）再進行
+    first="$(sed -n '1p' "$f")"
+    [ "$first" = "---" ] || continue
+    if ! sed -n '2,$p' "$f" | grep -q '^---$'; then
+        continue
+    fi
+
     status="$(kit_fm_get "$f" status)"
     [ "$status" = "done" ] || continue
 
     closed="$(kit_fm_get "$f" closed)"
     [ -n "$closed" ] || continue
+
+    # 驗證 closed 的日期格式（YYYY-MM-DD）
+    case "$closed" in
+      [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+      *) continue ;;
+    esac
+
     # 字典序比較對 YYYY-MM-DD 等價於時間序
     [ "$closed" \< "$cutoff" ] || continue
 
@@ -59,8 +87,8 @@ for f in "${dev}"/wave-*.md; do
     if grep -q "| ${wave_id} |" "$index" 2>/dev/null; then continue; fi
 
     month="$(printf '%s' "$closed" | cut -c1-7)"
-    destdir="${dev}/archive/${month}"
-    mkdir -p "$destdir"
+    destdir="${archive_root}/${month}"
+    mkdir -p "$destdir" || continue
 
     opened="$(kit_fm_get "$f" opened)"
     [ -n "$opened" ] || opened="?"
@@ -76,14 +104,22 @@ for f in "${dev}"/wave-*.md; do
     printf '| %s | %s~%s | %s | archive/%s/ |\n' \
         "$wave_id" "$opened" "$closed" "$summary" "$month" >> "$index"
 
-    git -C "$root" mv "$f" "${destdir}/${base}" 2>/dev/null || mv "$f" "${destdir}/${base}"
-    ledger="${dev}/wave-${wave_id}-ledger.md"
-    if [ -f "$ledger" ]; then
-        git -C "$root" mv "$ledger" "${destdir}/$(basename "$ledger")" 2>/dev/null \
-            || mv "$ledger" "${destdir}/$(basename "$ledger")"
+    # 搬移 wave 檔（檢查成功）
+    if git -C "$root" mv "$f" "${destdir}/${base}" 2>/dev/null || mv "$f" "${destdir}/${base}" 2>/dev/null; then
+        # 只在成功後才計數
+        [ "$moved" -ge 0 ] && moved=$((moved + 1))
+
+        # 搬移 ledger 檔（若存在）
+        ledger="${dev}/wave-${wave_id}-ledger.md"
+        if [ -f "$ledger" ]; then
+            git -C "$root" mv "$ledger" "${destdir}/$(basename "$ledger")" 2>/dev/null \
+                || mv "$ledger" "${destdir}/$(basename "$ledger")" 2>/dev/null
+        fi
     fi
-    moved=$((moved + 1))
 done
+
+kit_lock_release "$lockdir"
+trap - EXIT
 
 [ "$moved" -gt 0 ] && echo "已歸檔 ${moved} 個完成的波至 archive/（wave-INDEX.md 已更新）。"
 exit 0
