@@ -25,6 +25,7 @@ grep -rn "<關鍵詞>" <spec_layer>
 | specs 未涵蓋此面向，但 RFP `rfp_text` 隱含 | `BUG`（順帶補 detail_specs） |
 | specs 未涵蓋，RFP 亦無 | `NEW`（matrix 加 status: planned） |
 | 與 `rfp_text` 字面衝突 | `SPEC_CHANGE` ⚠️⚠️ 標「影響驗收」 |
+| 使用者要求的是內部改善（重構、清理、效能優化、測試補強），不改對外可觀察行為 | `CHORE`（matrix 填 —） |
 
 判為 `SPEC_CHANGE` 者，`status` 一律先填 `⚠️需客戶確認`，不得直接填 `ready`。
 
@@ -34,12 +35,17 @@ grep -rn "<關鍵詞>" <spec_layer>
 
 ## 4. 分流判定（flow 欄位）
 
-| 條件 | flow |
-|---|---|
-| `BUG` / `CHORE` | `direct` |
-| `SPEC_CHANGE` 單點行為調整 | `direct` |
-| `NEW` 且 ≤3 檔、無架構決策 | `direct` |
-| 其餘（≥4 檔／含架構或資料模型決策／需新增 matrix 條目／需客戶確認／跨模組） | `spec` |
+**先判規模——以下任一成立即 `flow: spec`，與 type 無關：**
+- 預估動 4 個以上檔案
+- 含架構或資料模型決策
+- 需新增 matrix 條目
+- 需客戶確認（含所有 `status: ⚠️需客戶確認` 的項）
+- 跨模組
+
+**以上皆不成立 → `flow: direct`。**
+
+type 與 flow 正交：一個 BUG 若要動 5 個檔並改資料模型，仍是 `flow: spec`；
+一個 NEW 若只加一個小欄位，仍是 `flow: direct`。
 
 `flow: direct` 的工作項**不需要**先走 brainstorming。這不是在合理化跳過流程——分流判定已在 triage 階段完成，重複 brainstorming 只會產生無人閱讀的 spec 並加劇文件堆積。
 
@@ -51,3 +57,4 @@ grep -rn "<關鍵詞>" <spec_layer>
 
 - 已處理的 `INB-NNN` 從 `inbox.md` 移除（其內容已轉入 backlog 的 `from` 欄）
 - 輸出處理摘要：新增 N 筆、併入 M 筆、dropped K 筆、⚠️ 待確認 J 筆
+- **若 config 已設 `spec_check` 且本批有任何 `type: SPEC_CHANGE` 或 `NEW` 的項目**（會動到規格層），輸出提醒使用者執行該指令驗證規格檔一致性。若 `spec_check` 為空則跳過此提醒。
