@@ -2,6 +2,9 @@
 
 > triage 後的料倉。`/wave --from backlog` 只取 `status: ready` 的項。
 > ⚠️需客戶確認 的項不會被自動取用，須人工改為 ready 或 dropped。
+>
+> **兩個入口**（見 `references/triage-rules.md` 步驟 0）：判斷完成（填得出 type/flow/matrix）
+> 可直接寫此檔；填不出來就寫 `inbox.md` 等 triage。
 
 | id | type | pri | flow | matrix | status | summary |
 |---|---|---|---|---|---|---|
@@ -19,3 +22,40 @@
 - **evidence**: <為何判定此 type 的依據>
 - **repro**: <重現步驟；BUG 才需要>
 - **wave**: —
+- **proof**: <完成後必填：commit hash／實測輸出／counter 變化>
+
+---
+
+## 欄位說明
+
+### `status` 值域
+
+| 值 | 意義 |
+|---|---|
+| `ready` | 可排波。`/wave --from backlog` 只取這個 |
+| `⚠️需客戶確認` | 硬閘門，wave 取不到。須人工改 ready 或 dropped |
+| `blocked:{原因}` | 有明確 blocker |
+| `🔶止血:{wave-id}` | **已緩解但未根治**——症狀消失、根因仍在。不可視同完成 |
+| `done:{wave-id}` | 完成。**必須同時填 `proof`**，否則視同未完成 |
+| `dropped:{理由}` | 不做 |
+
+### `pri` 值域
+
+| 值 | 意義 |
+|---|---|
+| `P0` | **本波製造的回歸**——自己造的債優先於一切既有待辦 |
+| `P1` | 擋驗收 |
+| `P2` | 客戶會碰到 |
+| `P3` | 體驗 |
+| `P4` | 有空再說 |
+
+### `proof` 欄（`done` 必填）
+
+「已完成」必須可被查證，不是宣稱。至少一項：
+
+- commit hash（`d40301f09`）
+- 實測輸出（`sub-xs 785 → 92`）
+- counter 變化（`gaps 117 → 64`）
+- 閘門結果（`main 閘門 exit 0，9 段全過`）
+
+**填不出 proof 就不能標 `done`**——那代表沒有實際驗證過。
