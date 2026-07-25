@@ -83,6 +83,15 @@ for f in "${dev}"/wave-*.md; do
       *) continue ;;
     esac
 
+    # 形狀合法不等於曆法合法——2026-01-99、2026-02-30 這種值形狀對但日期不存在。
+    # BSD 與 GNU 的 date 對超出範圍的日期常常不是直接失敗，而是靜默進位成
+    # 別的合法日期（如 2026-02-30 → 2026-03-02，exit code 仍是 0）。
+    # 因此不能只看 exit code：把解析結果轉回同格式跟原字串逐字比對，
+    # 對不上就代表原輸入不是真實存在的日期——不合法就跳過，不冒險刪檔。
+    parsed_closed="$(date -j -f '%Y-%m-%d' "$closed" +%Y-%m-%d 2>/dev/null)"
+    [ -n "$parsed_closed" ] || parsed_closed="$(date -d "$closed" +%Y-%m-%d 2>/dev/null)"
+    [ "$parsed_closed" = "$closed" ] || continue
+
     # 字典序比較對 YYYY-MM-DD 等價於時間序
     [ "$closed" \< "$cutoff" ] || continue
 

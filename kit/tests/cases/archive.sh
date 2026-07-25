@@ -232,6 +232,104 @@ printf '{"hook_event_name":"Stop"}' | (cd "$SANDBOX4" && bash "$HOOK") >/dev/nul
 assert_eq "1" "$([ -f "$DEV4/wave-baddate.md" ] && echo 1 || echo 0)" "非日期格式不被刪除"
 rm -rf "$SANDBOX4"
 
+# --- Critical 4（reviewer 回報）：closed 形狀合法但曆法不合法 → 不刪除
+# BSD/GNU 的 date 對超出範圍的欄位常常不是直接失敗，而是靜默進位成別的合法
+# 日期（如 2026-02-30 → 2026-03-02，exit code 仍是 0）。只驗形狀（四碼-兩碼-
+# 兩碼）擋不住這個；字典序比較也擋不住——2026-01-99 這種值字典序常常「早於」
+# cutoff，會被誤判逾期而誤刪（reviewer 實測命中的原始案例）。
+#
+# 四個案例一律用「去年」當年份，確保不管什麼時候跑這個測試，字典序一定早於
+# cutoff（年份數字本身就贏了，不必依賴當下月份湊巧落在哪）。
+PASTYEAR="$(date -v-1y '+%Y' 2>/dev/null || date -d '1 year ago' '+%Y')"
+CURYEAR="$(date '+%Y')"
+
+SANDBOX_CAL="$(kit_test_sandbox)"
+DEVCAL="$SANDBOX_CAL/.claude/dev"
+git -C "$SANDBOX_CAL" config user.email t@t.t
+git -C "$SANDBOX_CAL" config user.name t
+cat > "$DEVCAL/intake.config.yaml" <<'EOF'
+archive_after_days: 7
+EOF
+
+# 案例 1：reviewer 實測命中的原始案例——月份合法（01）、日期不存在（99），字典序早於 cutoff
+cat > "$DEVCAL/wave-cal-day99.md" <<EOF
+---
+wave_id: cal-day99
+status: done
+closed: ${PASTYEAR}-01-99
+---
+# 案例 1：reviewer 原始重現
+EOF
+
+# 案例 2（取代「只測月份=13」的僥倖版本）：同樣月份合法、日期不存在，但刻意
+# 選一個「即使沒有曆法檢查，字典序也一定早於 cutoff」的組合，證明擋下它的是
+# 曆法檢查本身、不是字典序運氣——月份不合法（13）的值不管哪一年字典序都
+# 「晚於」任何真實月份，用那個測不出防護有沒有真的生效。
+cat > "$DEVCAL/wave-cal-day32.md" <<EOF
+---
+wave_id: cal-day32
+status: done
+closed: ${PASTYEAR}-01-32
+---
+# 案例 2：驗證是防護擋下的，不是字典序巧合
+EOF
+
+# 附帶對照：2026-13-99 這種「月份不合法」的值本身就只能靠字典序僥倖擋下
+# （月份13字典序恆晚於任何真實月份），這裡證明它現在也被曆法檢查擋下，
+# 雙重保險而非單靠字典序運氣。
+cat > "$DEVCAL/wave-cal-month13.md" <<EOF
+---
+wave_id: cal-month13
+status: done
+closed: ${CURYEAR}-13-99
+---
+# 附帶對照：月份不合法
+EOF
+
+# 案例 3：2 月最多 29 天（閏年），30 日不存在
+cat > "$DEVCAL/wave-cal-feb30.md" <<EOF
+---
+wave_id: cal-feb30
+status: done
+closed: ${PASTYEAR}-02-30
+---
+# 案例 3：2 月 30 日不存在
+EOF
+
+# 案例 4：4 月只有 30 天，31 日不存在
+cat > "$DEVCAL/wave-cal-apr31.md" <<EOF
+---
+wave_id: cal-apr31
+status: done
+closed: ${PASTYEAR}-04-31
+---
+# 案例 4：4 月 31 日不存在
+EOF
+
+# 正向對照：合法且確實逾期的日期，同一個 sandbox 裡要正常被刪，
+# 證明曆法檢查不是「一律不刪」的過度保守版本
+cat > "$DEVCAL/wave-cal-valid.md" <<EOF
+---
+wave_id: cal-valid
+status: done
+closed: ${PASTYEAR}-01-15
+---
+# 正向對照：合法日期應正常被刪
+EOF
+
+git -C "$SANDBOX_CAL" add -A >/dev/null 2>&1
+git -C "$SANDBOX_CAL" commit -qm init >/dev/null 2>&1
+printf '{"hook_event_name":"Stop"}' | (cd "$SANDBOX_CAL" && bash "$HOOK") >/dev/null 2>&1
+
+assert_eq "1" "$([ -f "$DEVCAL/wave-cal-day99.md" ] && echo 1 || echo 0)" "曆法不合法（1月99日）不被刪除——reviewer 原始案例"
+assert_eq "1" "$([ -f "$DEVCAL/wave-cal-day32.md" ] && echo 1 || echo 0)" "曆法不合法（1月32日）不被刪除——證明是防護生效而非字典序巧合"
+assert_eq "1" "$([ -f "$DEVCAL/wave-cal-month13.md" ] && echo 1 || echo 0)" "曆法不合法（13月）不被刪除"
+assert_eq "1" "$([ -f "$DEVCAL/wave-cal-feb30.md" ] && echo 1 || echo 0)" "曆法不合法（2月30日）不被刪除"
+assert_eq "1" "$([ -f "$DEVCAL/wave-cal-apr31.md" ] && echo 1 || echo 0)" "曆法不合法（4月31日）不被刪除"
+assert_eq "0" "$([ -f "$DEVCAL/wave-cal-valid.md" ] && echo 1 || echo 0)" "曆法合法且逾期的日期仍正常被刪（防護不是一律不刪）"
+
+rm -rf "$SANDBOX_CAL"
+
 # --- Important：既有專案殘留 archive_root config key（如 dfaa 舊安裝）→ 不影響行為
 # archive_root 已停用，hooks/archive.sh 不再讀它；殘留的 key 應被安靜忽略，不報錯、不影響刪除判斷。
 SANDBOX5="$(kit_test_sandbox)"
