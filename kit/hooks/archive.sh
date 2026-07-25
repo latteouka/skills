@@ -152,4 +152,13 @@ kit_lock_release "$lockdir"
 trap - EXIT
 
 [ "$removed" -gt 0 ] && echo "已清除 ${removed} 個完成的波（wave-INDEX.md 已記錄取回指令）。"
+
+# 熱區檔名清單有變動才重生 README（快照比對，避免每 turn 改檔）
+snapshot="${dev}/.readme-snapshot"
+current="$(ls "${dev}"/*.md 2>/dev/null | xargs -n1 basename 2>/dev/null | sort | tr '\n' ' ')"
+if [ ! -f "$snapshot" ] || [ "$current" != "$(cat "$snapshot" 2>/dev/null)" ]; then
+    printf '%s' "$current" > "$snapshot"
+    bash "${KIT_ROOT}/scripts/gen-readme.sh" 2>/dev/null || true
+fi
+
 exit 0
