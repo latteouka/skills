@@ -9,5 +9,6 @@ spec_check: ""
 hot_zone_limit: 20      # .claude/dev/ 熱區 .md 檔數上限
 inbox_alert: 8          # 未整理筆數告警線
 stale_days: 60          # backlog ready 項多久算 stale
-archive_after_days: 7   # wave done 後多久自動歸檔
-archive_root: .claude/dev/archive
+archive_after_days: 7   # wave done 後多久自動清除（刪除＋wave-INDEX.md 記取回指令，非搬移）
+# archive_root: 已停用（2026-07-25 起 archive.sh 改為刪除，不再搬移到任何目錄）。
+# 保留此 key 供已安裝專案相容——kit_config_get 現在不會讀它，殘留值無害。

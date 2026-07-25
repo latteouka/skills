@@ -6,13 +6,12 @@ git -C "$SANDBOX" config user.email t@t.t
 git -C "$SANDBOX" config user.name t
 cat > "$DEV/intake.config.yaml" <<'EOF'
 archive_after_days: 7
-archive_root: .claude/dev/archive
 EOF
 
 OLD="$(date -v-30d '+%Y-%m-%d' 2>/dev/null || date -d '30 days ago' '+%Y-%m-%d')"
 NEW="$(date '+%Y-%m-%d')"
 
-# done 且逾期 → 應被歸檔
+# done 且逾期 → 應被 git rm（dashboard 本身 + ledger + 同 wave_id 的 spec/plan）
 cat > "$DEV/wave-old.md" <<EOF
 ---
 wave_id: old
@@ -20,8 +19,47 @@ status: done
 closed: $OLD
 ---
 # 舊波
-做了地圖改版，改用 MapLibre。
+做了地圖改版，改用 MapLibre 取代 Leaflet。
 EOF
+
+cat > "$DEV/wave-old-ledger.md" <<EOF
+# old 的 ledger
+決策記錄：選 MapLibre 因授權成本。
+EOF
+
+mkdir -p "$SANDBOX/docs/superpowers/specs" "$SANDBOX/docs/superpowers/plans" "$SANDBOX/docs/plans"
+
+cat > "$SANDBOX/docs/superpowers/specs/old-spec.md" <<EOF
+---
+wave_id: old
+---
+# old 的 spec
+EOF
+
+cat > "$SANDBOX/docs/superpowers/plans/old-plan.md" <<EOF
+---
+wave_id: old
+---
+# old 的 plan
+EOF
+
+cat > "$SANDBOX/docs/plans/old-notes.md" <<EOF
+---
+wave_id: old
+---
+# old 的補充計畫
+EOF
+
+# 不相干波的 plan（wave_id 不符）→ 不該被動到
+cat > "$SANDBOX/docs/plans/other-notes.md" <<EOF
+---
+wave_id: other
+---
+# 不相干的計畫
+EOF
+
+# docs/plans 底下完全沒有 frontmatter 的檔 → 不該被動到（kit_fm_get 回空，不比對）
+printf '# 沒有 frontmatter 的計畫\n' > "$SANDBOX/docs/plans/freeform.md"
 
 # done 但未逾期 → 不動
 cat > "$DEV/wave-fresh.md" <<EOF
@@ -48,25 +86,77 @@ printf '# 沒有 frontmatter 的舊檔\n' > "$DEV/wave-legacy.md"
 
 git -C "$SANDBOX" add -A >/dev/null 2>&1
 git -C "$SANDBOX" commit -qm init >/dev/null 2>&1
+PRE_HASH="$(git -C "$SANDBOX" rev-parse HEAD)"
 
 printf '{"hook_event_name":"Stop"}' | (cd "$SANDBOX" && bash "$HOOK") >/dev/null 2>&1
 
-MONTH="$(printf '%s' "$OLD" | cut -c1-7)"
-assert_eq "1" "$([ -f "$DEV/archive/$MONTH/wave-old.md" ] && echo 1 || echo 0)" "逾期 done 已歸檔"
-assert_eq "0" "$([ -f "$DEV/wave-old.md" ] && echo 1 || echo 0)" "原位置已移除"
+# --- 刪除本體驗證（尚未提交，仍在 working tree 檢查得到）
+assert_eq "0" "$([ -f "$DEV/wave-old.md" ] && echo 1 || echo 0)" "逾期 done 的 dashboard 已刪除"
+assert_eq "0" "$([ -f "$DEV/wave-old-ledger.md" ] && echo 1 || echo 0)" "對應 ledger 一併刪除"
+assert_eq "0" "$([ -f "$SANDBOX/docs/superpowers/specs/old-spec.md" ] && echo 1 || echo 0)" "同 wave_id 的 spec 一併刪除"
+assert_eq "0" "$([ -f "$SANDBOX/docs/superpowers/plans/old-plan.md" ] && echo 1 || echo 0)" "同 wave_id 的 plan 一併刪除"
+assert_eq "0" "$([ -f "$SANDBOX/docs/plans/old-notes.md" ] && echo 1 || echo 0)" "同 wave_id 的 docs/plans 一併刪除"
+assert_eq "1" "$([ -f "$SANDBOX/docs/plans/other-notes.md" ] && echo 1 || echo 0)" "wave_id 不符的 plan 不被刪除"
+assert_eq "1" "$([ -f "$SANDBOX/docs/plans/freeform.md" ] && echo 1 || echo 0)" "無 frontmatter 的 plan 不被刪除"
 assert_eq "1" "$([ -f "$DEV/wave-fresh.md" ] && echo 1 || echo 0)" "未逾期不動"
 assert_eq "1" "$([ -f "$DEV/wave-active.md" ] && echo 1 || echo 0)" "active 不動"
 assert_eq "1" "$([ -f "$DEV/wave-legacy.md" ] && echo 1 || echo 0)" "無 frontmatter 舊檔不動"
-assert_contains "$(cat "$DEV/wave-INDEX.md")" "old" "INDEX 有該波記錄"
-assert_contains "$(cat "$DEV/wave-INDEX.md")" "$MONTH" "INDEX 指向歸檔月份"
 
-# --- 冪等：再跑一次不應重複寫 INDEX
-lines1="$(grep -c '| old |' "$DEV/wave-INDEX.md" 2>/dev/null || echo 0)"
-printf '{"x":1}' | (cd "$SANDBOX" && bash "$HOOK") >/dev/null 2>&1
-lines2="$(grep -c '| old |' "$DEV/wave-INDEX.md" 2>/dev/null || echo 0)"
-assert_eq "$lines1" "$lines2" "重跑不重複寫 INDEX"
+INDEX_LINE="$(grep '| old |' "$DEV/wave-INDEX.md")"
+assert_contains "$INDEX_LINE" "old" "INDEX 有該波記錄"
+assert_contains "$INDEX_LINE" "$PRE_HASH" "INDEX 取回指令帶刪除前的 commit hash"
+assert_contains "$INDEX_LINE" "wave-old.md" "INDEX 取回指令含 dashboard 路徑"
+assert_contains "$INDEX_LINE" "wave-old-ledger.md" "INDEX 取回指令含 ledger 路徑"
+assert_contains "$INDEX_LINE" "old-spec.md" "INDEX 取回指令含 spec 路徑"
+assert_contains "$INDEX_LINE" "old-plan.md" "INDEX 取回指令含 plan 路徑"
+assert_contains "$INDEX_LINE" "old-notes.md" "INDEX 取回指令含 docs/plans 路徑"
+assert_not_contains "$INDEX_LINE" "other-notes.md" "INDEX 取回指令不含不相干的 plan"
 
-# --- Critical 1：畸形 frontmatter（有開頭無結尾）+ 內文含舊日期 → 不搬移
+# --- 冪等（尚未提交）：同一 session 內 Stop 再觸發一次，不應重複寫 INDEX、不應報錯
+lines_before_recommit="$(grep -c '| old |' "$DEV/wave-INDEX.md" 2>/dev/null || echo 0)"
+printf '{"hook_event_name":"Stop"}' | (cd "$SANDBOX" && bash "$HOOK") >/dev/null 2>&1
+rc_rerun_uncommitted=$?
+lines_after_recommit="$(grep -c '| old |' "$DEV/wave-INDEX.md" 2>/dev/null || echo 0)"
+assert_eq "$lines_before_recommit" "$lines_after_recommit" "未提交狀態下重跑不重複寫 INDEX"
+assert_eq "0" "$rc_rerun_uncommitted" "未提交狀態下重跑仍正常結束（檔案已不存在也不報錯）"
+
+# --- 提交刪除，驗證 git log 查得到、取回指令真的能拿回內容
+git -C "$SANDBOX" add -A >/dev/null 2>&1
+git -C "$SANDBOX" commit -qm "post-hook cleanup" >/dev/null 2>&1
+
+assert_eq "1" "$(git -C "$SANDBOX" log --oneline --diff-filter=D -- .claude/dev/wave-old.md | wc -l | tr -d ' ')" \
+    "git log --diff-filter=D 查得到 dashboard 的刪除紀錄"
+assert_eq "1" "$(git -C "$SANDBOX" log --oneline --diff-filter=D -- .claude/dev/wave-old-ledger.md | wc -l | tr -d ' ')" \
+    "git log --diff-filter=D 查得到 ledger 的刪除紀錄"
+assert_eq "1" "$(git -C "$SANDBOX" log --oneline --diff-filter=D -- docs/superpowers/specs/old-spec.md | wc -l | tr -d ' ')" \
+    "git log --diff-filter=D 查得到 spec 的刪除紀錄"
+
+dash_cmd="$(printf '%s' "$INDEX_LINE" | grep -o 'git show [0-9a-f]\{7,64\}:\.claude/dev/wave-old\.md' | head -1)"
+assert_contains "$dash_cmd" "git show" "能從 INDEX 抽出 dashboard 的取回指令"
+dash_content="$(cd "$SANDBOX" && eval "$dash_cmd" 2>/dev/null)"
+dash_rc=$?
+assert_eq "0" "$dash_rc" "dashboard 取回指令可執行（exit 0）"
+assert_contains "$dash_content" "MapLibre" "dashboard 取回指令真的能拿回原內容"
+
+ledger_cmd="$(printf '%s' "$INDEX_LINE" | grep -o 'git show [0-9a-f]\{7,64\}:\.claude/dev/wave-old-ledger\.md' | head -1)"
+ledger_content="$(cd "$SANDBOX" && eval "$ledger_cmd" 2>/dev/null)"
+assert_contains "$ledger_content" "決策記錄" "ledger 取回指令真的能拿回原內容"
+
+spec_cmd="$(printf '%s' "$INDEX_LINE" | grep -o 'git show [0-9a-f]\{7,64\}:docs/superpowers/specs/old-spec\.md' | head -1)"
+spec_content="$(cd "$SANDBOX" && eval "$spec_cmd" 2>/dev/null)"
+assert_contains "$spec_content" "old 的 spec" "spec 取回指令真的能拿回原內容"
+
+# --- 冪等（已提交後）：再跑一次仍不重複、不報錯
+lines_before_postcommit="$(grep -c '| old |' "$DEV/wave-INDEX.md" 2>/dev/null || echo 0)"
+printf '{"hook_event_name":"Stop"}' | (cd "$SANDBOX" && bash "$HOOK") >/dev/null 2>&1
+rc_rerun_committed=$?
+lines_after_postcommit="$(grep -c '| old |' "$DEV/wave-INDEX.md" 2>/dev/null || echo 0)"
+assert_eq "$lines_before_postcommit" "$lines_after_postcommit" "提交後重跑仍不重複寫 INDEX"
+assert_eq "0" "$rc_rerun_committed" "提交後重跑正常結束"
+
+rm -rf "$SANDBOX"
+
+# --- Critical 1：畸形 frontmatter（有開頭無結尾）+ 內文含舊日期 → 不刪除
 SANDBOX2="$(kit_test_sandbox)"
 DEV2="$SANDBOX2/.claude/dev"
 git -C "$SANDBOX2" config user.email t@t.t
@@ -89,10 +179,10 @@ git -C "$SANDBOX2" add -A >/dev/null 2>&1
 git -C "$SANDBOX2" commit -qm init >/dev/null 2>&1
 printf '{"hook_event_name":"Stop"}' | (cd "$SANDBOX2" && bash "$HOOK") >/dev/null 2>&1
 
-assert_eq "1" "$([ -f "$DEV2/wave-malformed.md" ] && echo 1 || echo 0)" "畸形 frontmatter 不被搬移"
+assert_eq "1" "$([ -f "$DEV2/wave-malformed.md" ] && echo 1 || echo 0)" "畸形 frontmatter 不被刪除"
 rm -rf "$SANDBOX2"
 
-# --- Critical 2：closed 為路徑跳脫 → 不搬移
+# --- Critical 2：closed 為路徑跳脫 → 不刪除
 SANDBOX3="$(kit_test_sandbox)"
 DEV3="$SANDBOX3/.claude/dev"
 git -C "$SANDBOX3" config user.email t@t.t
@@ -114,10 +204,10 @@ git -C "$SANDBOX3" add -A >/dev/null 2>&1
 git -C "$SANDBOX3" commit -qm init >/dev/null 2>&1
 printf '{"hook_event_name":"Stop"}' | (cd "$SANDBOX3" && bash "$HOOK") >/dev/null 2>&1
 
-assert_eq "1" "$([ -f "$DEV3/wave-path-escape.md" ] && echo 1 || echo 0)" "路徑跳脫不被搬移"
+assert_eq "1" "$([ -f "$DEV3/wave-path-escape.md" ] && echo 1 || echo 0)" "路徑跳脫不被刪除"
 rm -rf "$SANDBOX3"
 
-# --- Critical 2：closed 為非日期格式 → 不搬移
+# --- Critical 3：closed 為非日期格式 → 不刪除
 SANDBOX4="$(kit_test_sandbox)"
 DEV4="$SANDBOX4/.claude/dev"
 git -C "$SANDBOX4" config user.email t@t.t
@@ -139,38 +229,43 @@ git -C "$SANDBOX4" add -A >/dev/null 2>&1
 git -C "$SANDBOX4" commit -qm init >/dev/null 2>&1
 printf '{"hook_event_name":"Stop"}' | (cd "$SANDBOX4" && bash "$HOOK") >/dev/null 2>&1
 
-assert_eq "1" "$([ -f "$DEV4/wave-baddate.md" ] && echo 1 || echo 0)" "非日期格式不被搬移"
+assert_eq "1" "$([ -f "$DEV4/wave-baddate.md" ] && echo 1 || echo 0)" "非日期格式不被刪除"
 rm -rf "$SANDBOX4"
 
-# --- Important 2：archive_root 非預設值時的正確位置
+# --- Important：既有專案殘留 archive_root config key（如 dfaa 舊安裝）→ 不影響行為
+# archive_root 已停用，hooks/archive.sh 不再讀它；殘留的 key 應被安靜忽略，不報錯、不影響刪除判斷。
 SANDBOX5="$(kit_test_sandbox)"
 DEV5="$SANDBOX5/.claude/dev"
 git -C "$SANDBOX5" config user.email t@t.t
 git -C "$SANDBOX5" config user.name t
 cat > "$DEV5/intake.config.yaml" <<'EOF'
 archive_after_days: 7
-archive_root: custom/archive
+archive_root: .claude/dev/archive
 EOF
 
 OLD5="$(date -v-30d '+%Y-%m-%d' 2>/dev/null || date -d '30 days ago' '+%Y-%m-%d')"
-cat > "$DEV5/wave-custom.md" <<EOF
+cat > "$DEV5/wave-legacy-config.md" <<EOF
 ---
-wave_id: custom
+wave_id: legacy-config
 status: done
 closed: $OLD5
 ---
-# 自訂歸檔路徑測試
+# 殘留 archive_root config 下的正常刪除測試
 EOF
 
 git -C "$SANDBOX5" add -A >/dev/null 2>&1
 git -C "$SANDBOX5" commit -qm init >/dev/null 2>&1
 printf '{"hook_event_name":"Stop"}' | (cd "$SANDBOX5" && bash "$HOOK") >/dev/null 2>&1
+rc5=$?
 
-MONTH5="$(printf '%s' "$OLD5" | cut -c1-7)"
-assert_eq "1" "$([ -f "$SANDBOX5/custom/archive/$MONTH5/wave-custom.md" ] && echo 1 || echo 0)" "非預設 archive_root 路徑正確"
+assert_eq "0" "$rc5" "殘留 archive_root key 不導致 hook 出錯"
+assert_eq "0" "$([ -f "$DEV5/wave-legacy-config.md" ] && echo 1 || echo 0)" "殘留 archive_root key 不影響正常刪除判斷"
+assert_eq "0" "$([ -d "$DEV5/archive" ] && echo 1 || echo 0)" "不再建立任何 archive/ 目錄"
+assert_contains "$(cat "$DEV5/wave-INDEX.md")" "legacy-config" "INDEX 仍正確記錄"
+
 rm -rf "$SANDBOX5"
 
-# --- Important 1：並發情境下 INDEX 無重複行
+# --- 並發情境下 INDEX 無重複行、無重複刪除
 SANDBOX6="$(kit_test_sandbox)"
 DEV6="$SANDBOX6/.claude/dev"
 git -C "$SANDBOX6" config user.email t@t.t
@@ -200,10 +295,10 @@ for j in 1 2 3 4 5; do
 done
 wait
 
-# 檢查 INDEX 中 concurrent-1 的行數（應只有 1 行，不重複）
 concurrent_1_lines="$(grep -c '| concurrent-1 |' "$DEV6/wave-INDEX.md" 2>/dev/null || echo 0)"
 assert_eq "1" "$concurrent_1_lines" "並發下 INDEX 無重複行"
+assert_eq "0" "$([ -f "$DEV6/wave-concurrent-1.md" ] && echo 1 || echo 0)" "並發下該刪的檔仍確實被刪"
+assert_eq "0" "$([ -f "$DEV6/wave-concurrent-2.md" ] && echo 1 || echo 0)" "並發下第二個檔也確實被刪"
+assert_eq "0" "$([ -f "$DEV6/wave-concurrent-3.md" ] && echo 1 || echo 0)" "並發下第三個檔也確實被刪"
 
 rm -rf "$SANDBOX6"
-
-rm -rf "$SANDBOX"

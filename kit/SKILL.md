@@ -39,7 +39,7 @@ skill 只承載需要語意推理的判斷樹。
 | `lib/common.sh` | 共用函式（config／frontmatter／mkdir 鎖／編號） |
 | `hooks/capture.sh` | UserPromptSubmit：捕捉 |
 | `hooks/summary.sh` | SessionStart：積壓摘要 |
-| `hooks/archive.sh` | Stop：歸檔完成的波 |
+| `hooks/archive.sh` | Stop：清除逾期已完成的波（刪除＋INDEX 留取回指令） |
 | `references/triage-rules.md` | triage 判斷樹（本 skill 的核心知識） |
 | `references/patterns.txt` | 弱信號詞庫 |
 | `installers/intake.sh` | 安裝器 |
