@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
 # Stop hook — 清除已完成的波（不是搬移，是刪除 + 索引留一行可回溯的指令）。
 #
-# 只處理「frontmatter 明確標 status: done 且 closed 早於 archive_after_days」者。
-# 無 frontmatter 的舊檔一律不動（交由一次性大掃除人工裁決）——自動化不碰
-# 判斷不了的東西，是這套機制敢跑在 Stop hook 上的前提。
+# 兩條認定路徑（2026-07-25 起）：
+#   1. frontmatter `status: done` + `closed`（wave-close.sh 時代前的舊格式）
+#   2. 狀態行 fallback：無 frontmatter 但 `## 狀態：`／`**狀態**:` 行含 ✅
+#      且**不含任何「待」字**（待使用者／待人測／待執行…＝有未完事項，
+#      交給 wave-close 或人工，hook 不碰）。closed 以檔案最後 commit 日推定。
+#      為什麼認狀態行：frontmatter 是「要求的格式」，實測 0/52 有人寫；
+#      狀態行是波本來就會寫的「自然產物」，52/52 都有。hook 認自然產物
+#      才不會重蹈 frontmatter 空轉的覆轍。主要清除路徑仍是收尾當場跑
+#      wave-close.sh；本 hook 是漏網補救。
+#
+# 兩路徑共用的分支守衛：該波 branch（worktree-{id}／worktree-wave-{id}）
+# 尚有未併入 base 的 commit、或 worktree 還活著 → 一律不清（未 merge 的
+# dashboard 刪了，git show 只能拿到 branch 版本之外的內容）。
+# 無狀態行也無 frontmatter 的檔一律不動——自動化不碰判斷不了的東西。
 #
 # 2026-07-25 起改為刪除（非搬移到 archive/）：archive 目錄只是把堆積換個
 # 位置，一年後又是幾百檔。刪除前把「取回指令」（git show <hash>:<path>）
@@ -57,6 +68,14 @@ cutoff="$(date -v-"${after_days}"d '+%Y-%m-%d' 2>/dev/null \
     || date -d "${after_days} days ago" '+%Y-%m-%d' 2>/dev/null)" || exit 0
 [ -n "$cutoff" ] || exit 0
 
+# base 分支（分支守衛用）：main → master；都沒有則守衛採保守態（branch 存在即不清）
+basebranch=""
+if git -C "$root" rev-parse --verify -q main >/dev/null 2>&1; then
+    basebranch=main
+elif git -C "$root" rev-parse --verify -q master >/dev/null 2>&1; then
+    basebranch=master
+fi
+
 index="${main_dev}/wave-INDEX.md"
 if [ ! -f "$index" ]; then
     {
@@ -87,17 +106,25 @@ for f in "${dev}"/wave-*.md; do
     case "$base" in wave-INDEX.md) continue ;; esac
     case "$base" in *-ledger.md) continue ;; esac   # ledger 隨其 dashboard 一起處理
 
-    # 驗證該檔有合法的 frontmatter（成對 --- ）再進行
+    # 認定路徑 1：合法 frontmatter（成對 ---）。路徑 2：狀態行 fallback。
     first="$(sed -n '1p' "$f")"
-    [ "$first" = "---" ] || continue
-    if ! sed -n '2,$p' "$f" | grep -q '^---$'; then
-        continue
+    status=""
+    closed=""
+    if [ "$first" = "---" ] && sed -n '2,$p' "$f" | grep -q '^---$'; then
+        status="$(kit_fm_get "$f" status)"
+        closed="$(kit_fm_get "$f" closed)"
+    else
+        sline="$(grep -m1 '^## 狀態' "$f" 2>/dev/null | sed 's/^## 狀態[:：][[:space:]]*//')"
+        [ -n "$sline" ] || sline="$(grep -m1 '^\*\*狀態\*\*' "$f" 2>/dev/null | sed 's/^\*\*狀態\*\*[:：][[:space:]]*//')"
+        case "$sline" in
+            *待*) : ;;   # 帶「待」＝有未完事項（待使用者／待人測／待執行…），不自動清
+            *✅*)
+                status="done"
+                closed="$(git -C "$root" log -1 --format=%ad --date=short -- "$f" 2>/dev/null)"
+                ;;
+        esac
     fi
-
-    status="$(kit_fm_get "$f" status)"
     [ "$status" = "done" ] || continue
-
-    closed="$(kit_fm_get "$f" closed)"
     [ -n "$closed" ] || continue
 
     # 驗證 closed 的日期格式（YYYY-MM-DD）
@@ -124,19 +151,38 @@ for f in "${dev}"/wave-*.md; do
     # 已在 INDEX 就不重複（冪等）
     if grep -q "| ${wave_id} |" "$index" 2>/dev/null; then continue; fi
 
+    # 分支守衛（兩認定路徑共用）：該波 branch 尚有未併入 base 的 commit、
+    # 或其 worktree 還活著 → 不清。base 缺席時保守處理：branch 存在即不清。
+    guard_skip=0
+    wt_branches="$(git -C "$root" worktree list --porcelain 2>/dev/null \
+        | sed -n 's|^branch refs/heads/||p')"
+    for b in "worktree-${wave_id}" "worktree-wave-${wave_id}"; do
+        git -C "$root" rev-parse --verify -q "refs/heads/$b" >/dev/null 2>&1 || continue
+        if [ -z "$basebranch" ]; then guard_skip=1; break; fi
+        cnt="$(git -C "$root" rev-list --count "${basebranch}..${b}" 2>/dev/null)"
+        [ -n "$cnt" ] || cnt=1   # 查不出來就當未併，保守
+        if [ "$cnt" -gt 0 ]; then guard_skip=1; break; fi
+        if printf '%s\n' "$wt_branches" | grep -qx "$b"; then guard_skip=1; break; fi
+    done
+    [ "$guard_skip" -eq 0 ] || continue
+
     # 沒有 commit 歷史就無法提供取回指令——寧可不刪，也不留下刪不回的檔
     hash="$(git -C "$root" rev-parse HEAD 2>/dev/null)"
     [ -n "$hash" ] || continue
 
     opened="$(kit_fm_get "$f" opened)"
+    [ -n "$opened" ] || opened="$(head -1 "$f" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)"
     [ -n "$opened" ] || opened="?"
 
-    # 摘要取內文第一個非空、非標題、非 frontmatter 的段落首行（刪除前萃取）
-    summary="$(sed -n '/^---$/,/^---$/!p' "$f" \
+    # 摘要優先取狀態行（波的一句話結果，與 wave-close.sh 同準則）；
+    # 退而求其次取首個內容段落
+    summary="$(grep -m1 '^## 狀態' "$f" 2>/dev/null | sed 's/^## 狀態[:：][[:space:]]*//')"
+    [ -n "$summary" ] || summary="$(grep -m1 '^\*\*狀態\*\*' "$f" 2>/dev/null | sed 's/^\*\*狀態\*\*[:：][[:space:]]*//')"
+    [ -n "$summary" ] || summary="$(sed -n '/^---$/,/^---$/!p' "$f" \
         | grep -v '^#' \
         | grep -v '^[[:space:]]*$' \
-        | sed -n '1p' \
-        | cut -c1-80)"
+        | sed -n '1p')"
+    summary="$(printf '%s' "$summary" | tr '|' '｜' | cut -c1-100)"
     [ -n "$summary" ] || summary="（無摘要）"
 
     # 收集本波要一併刪除的檔案：dashboard 本身 + ledger + 同 wave_id 的 spec/plan

@@ -82,11 +82,15 @@ else
           matcher: "startup|resume|clear|compact",
           hooks: [{ type: "command", command: ($k + "/summary.sh"), timeout: 5 }]
         }]
+      | .hooks.SessionStart += [{
+          matcher: "startup|resume|clear|compact",
+          hooks: [{ type: "command", command: ($k + "/wave-awareness.sh"), timeout: 10 }]
+        }]
       | .hooks.Stop += [{
           hooks: [{ type: "command", command: ($k + "/archive.sh"), timeout: 15 }]
         }]
     ' "$settings" > "$tmp" && mv "$tmp" "$settings"
-    created="${created} settings.json(3個hook)"
+    created="${created} settings.json(4個hook)"
 fi
 
 # --- .gitignore：kit 執行期產物（鎖檔／快照／衍生 README）不進版控。

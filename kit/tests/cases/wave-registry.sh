@@ -44,7 +44,7 @@ echo alpha-impl > "$WA/src/new-widget.txt"
 git -C "$WA" add -A >/dev/null 2>&1 && git -C "$WA" commit -qm alpha2 >/dev/null 2>&1
 echo beta-impl > "$WB/src/new-widget.txt"
 git -C "$WB" add -A >/dev/null 2>&1 && git -C "$WB" commit -qm beta2 >/dev/null 2>&1
-echo dirty > "$WB/uncommitted.txt"   # beta 留一個未 commit 檔
+echo dirty > "$WB/uncommitted.txt"   # beta 留一個未 commit 檔（必須在最後一個 add -A 之後）
 
 run() { (cd "$SANDBOX" && bash "$SCRIPT" "$@" 2>&1); }
 rc_of() { (cd "$SANDBOX" && bash "$SCRIPT" "$@" >/dev/null 2>&1); echo $?; }
@@ -53,10 +53,11 @@ rc_of() { (cd "$SANDBOX" && bash "$SCRIPT" "$@" >/dev/null 2>&1); echo $?; }
 out="$(run list)"
 assert_contains "$out" "worktree-alpha" "list 應含 alpha"
 assert_contains "$out" "worktree-beta" "list 應含 beta"
-alpha_line="$(printf '%s\n' "$out" | grep worktree-alpha)"
-assert_contains "$alpha_line" "4" "alpha 應有 4 個已改檔"
-beta_line="$(printf '%s\n' "$out" | grep worktree-beta)"
-assert_contains "$beta_line" "1" "beta 應顯示 1 個未 commit 檔"
+# 欄位精確比對（整列子字串會被時間戳偽命中）
+# alpha 已改 = app/config/INDEX/alpha.txt/new-widget = 5；beta 留 1 個未 commit
+assert_eq "5" "$(printf '%s\n' "$out" | awk '/worktree-alpha/{print $2}')" "alpha 應有 5 個已改檔"
+assert_eq "0" "$(printf '%s\n' "$out" | awk '/worktree-alpha/{print $3}')" "alpha 未 commit 應為 0"
+assert_eq "1" "$(printf '%s\n' "$out" | awk '/worktree-beta/{print $3}')" "beta 未 commit 應為 1"
 
 # 從 worktree 內呼叫也要解析到主 repo 的全部 worktree（kit_main_repo_root）
 out2="$( (cd "$WA" && bash "$SCRIPT" list 2>&1) )"
