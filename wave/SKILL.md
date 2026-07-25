@@ -703,18 +703,7 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
    - **打勾必須寫回 dashboard**：核對結果以 `[x] + 一句佐證` 直接編輯進 wave-{id}.md 的 🎯 區塊、隨收尾 commit 進版控——只在對話輸出核對文字 = 沒核對
    - **核對 (8) 不可單勾**：必須在 🎯 區塊 (8) 下方列出本波實際發生的所有停點（時點 + 原因），逐一對照「停點規則」合法清單；單句斷言（「全程僅兩停點」）不算核對。有任何一次停點不在合法清單 → (8) 不可勾，如實記錄違規
    - **Advisor 終檢**（工具可用時）：打勾前執行「Advisor 諮詢協議」諮詢點 4，結果記 ledger；advisor 點出實質遺漏 → 處理完才標「✅ 完成」
-   - **收尾必填 frontmatter**：標「✅ 完成」的同時，在 `wave-{id}.md` 檔首寫入 frontmatter：
-     ```yaml
-     ---
-     wave_id: {id}
-     status: done
-     opened: YYYY-MM-DD
-     closed: YYYY-MM-DD
-     backlog_items: [B-042, B-043]
-     ---
-     ```
-     並把消化掉的 backlog 項改為 `done:{wave-id}`。**未填 `status` 與 `closed` 者，`Stop` hook 的自動歸檔
-     不會處理，該波會永久留在熱區**——這不是格式建議，是歸檔機制能否辨識本波的前提。
+   - **消化掉的 backlog 項改為 `done:{wave-id}`**
 4. **未涵蓋事項揭露**（每波必做——grill 已無條件執行）：
    - 讀取本波期間 append 到 `.claude/dev/inbox.md` 的項目（`from: grill:*` 與執行中冒出的）
    - 在完成報告中**醒目列出**，每筆一行：內容 ＋ 為何本波不做
@@ -722,6 +711,18 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
    - **這段在 goal condition 判定之外**——即使 goal 全綠，未涵蓋事項仍需揭露
    - 未裝 intake kit 的專案：改讀本波 dashboard 的「未涵蓋決策」區
 5. 提示使用者「本波完成，可以 merge 回 main」
+6. **merge 後清除本波產物**（`bash <kit>/scripts/wave-close.sh {id}`）——波的 dashboard 與
+   ledger 在 merge 之後對未來沒有價值，內容留在 git history 即可。腳本會驗證每個檔都已提交
+   且無未提交修改（任一不符即中止），把 `git show` 取回指令寫進 `wave-INDEX.md`，再 `git rm`
+   dashboard＋ledger＋同 wave_id 的 spec/plan。先跑 `--dry-run` 確認範圍，刪除與 INDEX 一起 commit。
+   - **dashboard 裡的「待使用者」事項要先搬到 `.claude/dev/inbox.md`**——人眼驗收、seed 重跑、
+     待授權的破壞性操作等，清掉 dashboard 等於清掉這些待辦；先落到使用者會看的地方再清。
+   - 尚未 merge 就不要清——還沒進 main 的內容，`git show` 只拿得到 branch 上的版本。
+   - **為什麼是當場清、而不是標記等歸檔**：舊設計要求收尾寫 frontmatter（`status: done` +
+     `closed`），交由 `Stop` hook 的 `archive.sh` 在 N 天後刪除。2026-07-25 實測 dfaa 的 52 個
+     `wave-*.md`：**0 個有 frontmatter**，包含當天剛完成、走完整流程且收尾稽核 VERIFIED 的
+     5 個波。條文寫得再明確也沒被執行，於是熱區只增不減。改成呼叫一個指令，消掉兩個失敗點：
+     收尾者要記得寫且格式要對、hook 要在 N 天後正確觸發。`archive.sh` 仍在，角色降為漏網補救。
 
 ## 多波並行
 
