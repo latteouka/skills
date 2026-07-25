@@ -12,8 +12,17 @@
 # 用 git rm 不用 rm：資料仍留在 git history，且刪除必先有可用的 commit hash
 # 才會動手（沒有 commit 歷史 = 無法回溯 = 不刪，安全第一）。
 #
-# 順序關鍵：先讀內容萃取摘要、算好取回指令、寫進 INDEX，最後才刪檔。
-# 順序顛倒會得到只有檔名沒有內容的索引。
+# 安全守衛（2026-07-25 補）：光是「repo 有 HEAD」不代表「這個檔案」真的已
+# 提交——gitignore 掉、剛建立還沒 commit、或已提交但有未提交的修改，這三種
+# 情況「取回指令」都拿不回真正該還的內容（git show 對未提交過的路徑直接
+# fatal；有未提交修改的檔案只能拿回舊版，未提交那部分永久消失且無警告）。
+# 因此每個要刪的檔都必須先驗證①在算出的 commit 存在②相對 HEAD 沒有未提交
+# 的修改，任一檔不符就整個波跳過不刪。git rm 失敗時也不 fallback 到 rm -f
+# ——git 拒絕刪除就代表有異常，應該停手而不是照刪。
+#
+# 順序關鍵：先讀內容萃取摘要、算好取回指令；守衛通過、確認刪除成功後，
+# 才寫 INDEX——避免刪除失敗時留下「INDEX 說已歸檔，檔案其實還在」的孤兒
+# 記錄（冪等檢查看 INDEX 有沒有這行，孤兒記錄會讓該波永遠不再被重試）。
 
 set -u
 
@@ -138,13 +147,32 @@ for f in "${dev}"/wave-*.md; do
         done
     done
 
-    # 先寫 INDEX，後刪檔——順序不可顛倒（刪完就讀不到內文摘要了）
+    # 安全守衛：每個要刪的檔都必須①在 $hash（此刻的 HEAD）已提交
+    # ②相對 HEAD 沒有未提交的修改。任一檔不符就整個波跳過——不冒險刪掉
+    # 「取回指令救不回」的內容。
+    safe=1
+    for rf in "${files_to_remove[@]}"; do
+        rel="$(rel_path "$rf")"
+        if ! git -C "$root" cat-file -e "${hash}:${rel}" 2>/dev/null; then
+            safe=0; break
+        fi
+        if ! git -C "$root" diff --quiet HEAD -- "$rf" 2>/dev/null; then
+            safe=0; break
+        fi
+    done
+    [ "$safe" -eq 1 ] || continue
+
+    # 逐一 git rm；沒有 rm -f 兜底——上面的守衛已確保正常情況下 git rm 一定
+    # 成功，萬一仍失敗（權限異常等）就整個波跳過，不留半刪狀態。
+    rm_ok=1
+    for rf in "${files_to_remove[@]}"; do
+        git -C "$root" rm -q -- "$rf" 2>/dev/null || { rm_ok=0; break; }
+    done
+    [ "$rm_ok" -eq 1 ] || continue
+
+    # 確認全部刪除成功後才寫 INDEX——避免刪除失敗留下孤兒索引行
     printf '| %s | %s~%s | %s | %s |\n' \
         "$wave_id" "$opened" "$closed" "$summary" "$retrieve_cmds" >> "$index"
-
-    for rf in "${files_to_remove[@]}"; do
-        git -C "$root" rm -q -- "$rf" 2>/dev/null || rm -f "$rf" 2>/dev/null
-    done
     removed=$((removed + 1))
 done
 

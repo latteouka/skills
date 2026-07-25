@@ -71,12 +71,14 @@ closed: $NEW
 # 新完成的波
 EOF
 
-# active → 不動
+# active → 不動（closed 刻意填「已逾期」的舊日期——如果 status 這道守衛被拿掉，
+# 光靠 closed 存在與否擋不住這筆會被誤刪；必須要真的檢查 status 才會安全跳過）
 cat > "$DEV/wave-active.md" <<EOF
 ---
 wave_id: active
 status: active
 opened: $NEW
+closed: $OLD
 ---
 # 進行中
 EOF
@@ -400,3 +402,81 @@ assert_eq "0" "$([ -f "$DEV6/wave-concurrent-2.md" ] && echo 1 || echo 0)" "並�
 assert_eq "0" "$([ -f "$DEV6/wave-concurrent-3.md" ] && echo 1 || echo 0)" "並發下第三個檔也確實被刪"
 
 rm -rf "$SANDBOX6"
+
+# --- C1（資料損失防護）：三種「刪了救不回」的情境都必須整波跳過，不刪、
+# 不寫 INDEX。舊版邏輯 git rm 失敗就 fallback rm -f，三種情境全部靜默毀檔
+# （取回指令 git show <hash>:<path> 對從未提交的路徑直接 fatal；有未提交
+# 修改的檔案只能拿回舊版，未提交那部分永久消失且無警告）。
+OLD_C1="$(date -v-30d '+%Y-%m-%d' 2>/dev/null || date -d '30 days ago' '+%Y-%m-%d')"
+
+# 情境①：gitignore 掉的波檔案（從未 commit 過）
+SANDBOX_GI="$(kit_test_sandbox)"
+DEV_GI="$SANDBOX_GI/.claude/dev"
+git -C "$SANDBOX_GI" config user.email t@t.t
+git -C "$SANDBOX_GI" config user.name t
+cat > "$DEV_GI/intake.config.yaml" <<'EOF'
+archive_after_days: 7
+EOF
+printf '.claude/dev/wave-gitignored.md\n' > "$SANDBOX_GI/.gitignore"
+cat > "$DEV_GI/wave-gitignored.md" <<EOF
+---
+wave_id: gitignored
+status: done
+closed: $OLD_C1
+---
+# 被 gitignore 掉的波（從未 commit 過）
+EOF
+git -C "$SANDBOX_GI" add -A >/dev/null 2>&1
+git -C "$SANDBOX_GI" commit -qm init >/dev/null 2>&1
+printf '{"hook_event_name":"Stop"}' | (cd "$SANDBOX_GI" && bash "$HOOK") >/dev/null 2>&1
+assert_eq "1" "$([ -f "$DEV_GI/wave-gitignored.md" ] && echo 1 || echo 0)" "C1①：gitignore 掉、從未提交的檔案不被刪除"
+assert_eq "0" "$(grep -c '| gitignored |' "$DEV_GI/wave-INDEX.md" 2>/dev/null)" "C1①：不寫入救不回的 INDEX 記錄"
+rm -rf "$SANDBOX_GI"
+
+# 情境②：剛建立、還沒 add/commit 的波檔案
+SANDBOX_UN="$(kit_test_sandbox)"
+DEV_UN="$SANDBOX_UN/.claude/dev"
+git -C "$SANDBOX_UN" config user.email t@t.t
+git -C "$SANDBOX_UN" config user.name t
+cat > "$DEV_UN/intake.config.yaml" <<'EOF'
+archive_after_days: 7
+EOF
+git -C "$SANDBOX_UN" add -A >/dev/null 2>&1
+git -C "$SANDBOX_UN" commit -qm init >/dev/null 2>&1
+cat > "$DEV_UN/wave-untracked.md" <<EOF
+---
+wave_id: untracked
+status: done
+closed: $OLD_C1
+---
+# 從未 add 過的波
+EOF
+printf '{"hook_event_name":"Stop"}' | (cd "$SANDBOX_UN" && bash "$HOOK") >/dev/null 2>&1
+assert_eq "1" "$([ -f "$DEV_UN/wave-untracked.md" ] && echo 1 || echo 0)" "C1②：從未 commit 過的檔案不被刪除"
+assert_eq "0" "$(grep -c '| untracked |' "$DEV_UN/wave-INDEX.md" 2>/dev/null)" "C1②：不寫入救不回的 INDEX 記錄"
+rm -rf "$SANDBOX_UN"
+
+# 情境③：已提交過，但有未提交的修改（使用者真正想留住的是修改後的內容）
+SANDBOX_DIRTY="$(kit_test_sandbox)"
+DEV_DIRTY="$SANDBOX_DIRTY/.claude/dev"
+git -C "$SANDBOX_DIRTY" config user.email t@t.t
+git -C "$SANDBOX_DIRTY" config user.name t
+cat > "$DEV_DIRTY/intake.config.yaml" <<'EOF'
+archive_after_days: 7
+EOF
+cat > "$DEV_DIRTY/wave-dirty.md" <<EOF
+---
+wave_id: dirty
+status: done
+closed: $OLD_C1
+---
+# 舊版內容
+EOF
+git -C "$SANDBOX_DIRTY" add -A >/dev/null 2>&1
+git -C "$SANDBOX_DIRTY" commit -qm init >/dev/null 2>&1
+printf '\n未提交的補充內容——這段如果被刪掉就永久消失\n' >> "$DEV_DIRTY/wave-dirty.md"
+printf '{"hook_event_name":"Stop"}' | (cd "$SANDBOX_DIRTY" && bash "$HOOK") >/dev/null 2>&1
+assert_eq "1" "$([ -f "$DEV_DIRTY/wave-dirty.md" ] && echo 1 || echo 0)" "C1③：有未提交修改的檔案不被刪除"
+assert_contains "$(cat "$DEV_DIRTY/wave-dirty.md" 2>/dev/null)" "未提交的補充內容" "C1③：未提交的內容仍完整保留在工作目錄"
+assert_eq "0" "$(grep -c '| dirty |' "$DEV_DIRTY/wave-INDEX.md" 2>/dev/null)" "C1③：不寫入只能拿回舊版的 INDEX 記錄"
+rm -rf "$SANDBOX_DIRTY"

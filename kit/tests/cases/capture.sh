@@ -75,4 +75,27 @@ assert_not_contains "$out" "已自動收錄" "失敗訊息不謊報成功"
 chmod 755 "$INBOX_NO_PERM"
 rm -rf "$SANDBOX_NO_PERM"
 
+# --- [NEW] C3：使用者原話引用既有編號（如「這跟 INB-042 是同一個問題」）
+# 要完整保留，不可再被全域抹掉——kit_next_id 現在只認 ^## 標題行，
+# 引用文字混在 raw 裡不會污染下一個編號的計算。
+out="$(run_capture '"!這跟 INB-042 是同一個問題"')"
+inbox_raw="$(tail -1 "$INBOX")"
+assert_contains "$inbox_raw" "INB-042" "raw 保留使用者對既有編號的引用（不再整串抹掉）"
+
+# --- [NEW] N1：長篇工具輸出／報告內文中間出現 #bug 字樣，不應被自動收錄
+# 2026-07-25 實戰教訓：一份 6KB 的 subagent review 報告因說明文字裡提到
+# #bug，整篇被寫進 inbox（INB-007，事後人工移除）。真正的強信號用法是
+# 「打字打 #bug 開頭」，不會出現在幾百字之後。
+before_inbox="$(cat "$INBOX")"
+FILLER_MID="$(printf 'x%.0s' $(seq 1 600))"
+out="$(run_capture "\"這是一份很長的 review 報告。${FILLER_MID}這一段提到 #bug 這個字，但只是在說明文字裡，不是要回報問題。\"")"
+assert_eq "$before_inbox" "$(cat "$INBOX")" "長篇文字中間出現 #bug 不被自動收錄"
+assert_eq "" "$out" "長篇文字中間出現 #bug 靜默（不觸發強信號提示）"
+
+# --- [NEW] N1：開頭有 #bug 標記，但整則訊息長度遠超合理範圍，也不自動收錄
+# （避免「剛好開頭 50 字內含 #bug」的長篇貼文繞過開頭位置檢查）
+FILLER_LONG="$(printf 'y%.0s' $(seq 1 600))"
+out="$(run_capture "\"#bug 開頭有標記但後面接超長內容：${FILLER_LONG}\"")"
+assert_eq "$before_inbox" "$(cat "$INBOX")" "開頭有 #bug 但總長度過長仍不自動收錄"
+
 rm -rf "$SANDBOX"

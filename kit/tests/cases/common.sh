@@ -90,6 +90,17 @@ cat > "$SANDBOX/inbox.md" <<'EOF'
 EOF
 assert_eq "INB-043" "$(kit_next_id "$SANDBOX/inbox.md" INB)" "取最大編號 +1"
 
+# --- [NEW] C3 根因修正：只認 ^## 標題行，內文引用既有編號不污染計數
+# （2026-07-25 修正前：grep -o 全檔掃描，raw 裡出現的「INB-042」會把
+# 下一號劫持到 INB-043，即使真正最大的條目只有 INB-001）
+cat > "$SANDBOX/inbox2.md" <<'EOF'
+## INB-001
+- when: 2026-07-25 12:00
+- from: 口述
+- raw: 這跟 INB-042 是同一個問題
+EOF
+assert_eq "INB-002" "$(kit_next_id "$SANDBOX/inbox2.md" INB)" "非標題行內的編號引用不影響計數"
+
 # --- kit_lock：取得後再取應失敗
 LOCK="$SANDBOX/.t.lock"
 kit_lock_acquire "$LOCK" 2 && r1=0 || r1=1

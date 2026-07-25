@@ -35,11 +35,29 @@ emit_context() {
 }
 
 # ---- 強信號判定 -------------------------------------------------------
+# `!` 前綴是使用者在訊息開頭明確打的動作，不論長度都當強信號。
+# #bug/#todo/#idea 則不同：這三個詞可能只是「剛好出現在一段長文字裡」
+# （貼上的 log、subagent 報告、程式碼片段），不代表使用者要回報東西。
+# 2026-07-25 實戰教訓：一份 6KB 的 review 報告因說明文字裡提到 #bug 字樣，
+# 整篇被當強信號寫進 inbox。真實的標記用法是「打字打 #bug 開頭」，不會
+# 出現在幾千字之後——因此只有「標記在開頭附近」且「整則訊息長度合理」
+# 兩條件同時成立才觸發自動寫入；否則最多落到下面的弱信號提醒（不寫檔，
+# 由 Claude 判斷語意）。
 raw=""
 case "$prompt" in
-    '!'*)          raw="${prompt#!}" ;;
-    *'#bug'*|*'#todo'*|*'#idea'*)
-        raw="$prompt"
+    '!'*)
+        raw="${prompt#!}"
+        ;;
+    *)
+        head_chunk="${prompt:0:50}"
+        case "$head_chunk" in
+            *'#bug'*|*'#todo'*|*'#idea'*)
+                prompt_len=${#prompt}
+                if [ "$prompt_len" -le 500 ]; then
+                    raw="$prompt"
+                fi
+                ;;
+        esac
         ;;
 esac
 
@@ -50,10 +68,12 @@ if [ -n "$raw" ]; then
     # 正規化空白：前後 trim + 將換行替換為 |
     raw="$(printf '%s' "$raw" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
     raw="$(printf '%s' "$raw" | tr '\n' '|')"
-    
-    # 移除類似編號的模式（防止偽造條目劫持編號計數）
-    raw="$(printf '%s' "$raw" | sed 's/INB-[0-9][0-9]*//g')"
-    
+    # 上面這行已把換行拍平成 |，使用者原話裡不可能再冒出獨立一行的
+    # 「## INB-999」去偽造條目標題；kit_next_id 現在也只認 ^## 開頭的標題行
+    # （見 lib/common.sh），兩層防護疊加，因此這裡不再需要把使用者引用既有
+    # 編號的文字整個抹掉（2026-07-25 修正：舊版 sed 全域移除 INB-NNN 會把
+    # 「這跟 INB-042 是同一個問題」這種合理引用也吃掉，造成資料損失）。
+
     [ -n "$raw" ] || exit 0
 
     lockdir="${root}/.claude/dev/.inbox.lock"

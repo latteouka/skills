@@ -70,12 +70,17 @@ kit_fm_get() {
 
 # kit_next_id <file> <prefix>
 # 掃檔案取 <prefix>-NNN 的最大值 +1，補三位數。空檔／缺檔回 <prefix>-001。
+#
+# 只認「## <prefix>-NNN」標題行（條目本身），不掃整檔——內文引用既有編號
+# （如「這跟 INB-042 是同一個問題」、backlog.md 的「from: INB-042」）不是
+# 條目，不該被算進最大值，否則會把下一號劫持掉（2026-07-25 修正：舊版
+# grep -o 全檔掃描，行內任何 INB-NNN 字面值都會誤判成條目）。
 kit_next_id() {
     local file="$1" prefix="$2" max
     max=0
     if [ -f "$file" ]; then
-        max="$(grep -o "${prefix}-[0-9][0-9]*" "$file" 2>/dev/null \
-            | sed "s/${prefix}-//" \
+        max="$(grep -o "^## ${prefix}-[0-9][0-9]*" "$file" 2>/dev/null \
+            | sed "s/^## ${prefix}-//" \
             | sort -n \
             | tail -1)"
         [ -n "$max" ] || max=0
