@@ -47,12 +47,13 @@
 
 **漏項掃描**：（requirements 有標記但無對應工作項的清單，無則寫「無漏項」）
 
-## 📋 延後決策（Deferred from grill/spec）
-<!-- Phase 2.5 有觸發 grill/brainstorming 時必填此區塊；沒觸發時整區刪除 -->
-| # | 決策 | 來源 | 延後原因 | 優先順序 |
-|---|------|------|---------|---------|
-| 1 | [決策內容] | [spec §N / grill Q#] | [scope cut / blocker] | 🔴/🟡/🟢 |
-<!-- 無延後項時寫：「本波涵蓋所有 grill/spec 決策，無延後項。」 -->
+## 📋 未涵蓋決策
+<!-- 有裝 intake kit 的專案：整區刪除。未涵蓋項 append 到 .claude/dev/inbox.md
+     （from: grill:{題目}），由下次開波的 triage 一併處理，wave 不自維護此表。
+     此區僅供未裝 kit 的專案使用。 -->
+| # | 決策 | 來源 | 為何本波不做 |
+|---|------|------|-------------|
+| 1 | [決策內容] | [spec §N / grill Q#] | [scope cut / blocker / 依賴未就緒] |
 ```
 
 ## Ledger 格式
