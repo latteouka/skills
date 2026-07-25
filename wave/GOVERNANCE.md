@@ -7,6 +7,7 @@
    （b）floor-guard 定位（本地 null 但目標 tier 有實證/實戰失敗案例）上線——兩者皆須 provenance 帳本標注依據並列入閱卷觀察名單。
 2. 綁動作 artifact：條款綁編號動作、產出具名可重跑 artifact；缺席型義務走終端 artifact gate
 3. 加一減一：每次整合附刪減清單；core 硬上限 800 行（scripts/wave-lint.sh 強制）
+4. 禁止「完工後複查」型條款：新條款若要求在工作完成後再派 agent／再請一個模型複驗自己的產出，一律不收——[官方 Opus 5 指引](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5)明列此類為 over-verification。品質不足要補的是 deterministic gate（gate script／lint／測試 exit code），不是多一層模型意見。（2026-07-25 據此移除抗辯／收尾稽核／advisor 諮詢點 3-4，見 provenance 帳本「已移除條款」）
 
 ## 例行
 - 每輪閱卷報告必附「刪減候選」：連續兩輪未防住任何失分且未被引用的條款

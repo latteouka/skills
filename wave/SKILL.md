@@ -38,7 +38,7 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 - Phase 1 → 2 → 2.5 → 3
 - Phase 4 確認後 → Phase 5 產出 → Phase 6 建 worktree → 設 goal → 開工
 - 執行期項與項之間
-- 品質閘門 → 稽核 → 收尾
+- 品質閘門 → 收尾
 
 **Turn 結束前自檢：** 結束 turn 前檢查最後一段輸出——若是計畫、問題、下一步清單、或「我接下來會…」的承諾 → 立刻用 tool call 做掉，不准就此結束 turn。（本節所列合法停點與例外的提問不在此限。）
 
@@ -133,7 +133,7 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 
 > 掃描必須在 Align（Phase 0 Step 3 / Phase 1）**之後**執行——新素材要先落檔 requirements 才掃得到，順序顛倒會掃到舊狀態。Phase 0 不預跑掃描。
 
-**回饋批次不降級：** 不論工作項來自哪個來源（backlog、驗收台 issue、LINE 回報、bug 清單），管線完全相同——驗證合約、🔒 安全步驟、品質閘門、收尾稽核、goal condition 全部照走，不因「只是小修」降級任何規則。與 CONTEXT.md／requirements 矛盾的項先與使用者裁定，不默默改。
+**回饋批次不降級：** 不論工作項來自哪個來源（backlog、驗收台 issue、LINE 回報、bug 清單），管線完全相同——驗證合約、🔒 安全步驟、品質閘門、goal condition 全部照走，不因「只是小修」降級任何規則。與 CONTEXT.md／requirements 矛盾的項先與使用者裁定，不默默改。
 
 > **CRITICAL: 掃描完備優先於掃描速度。四個來源各掃一輪後再掃一輪，連續兩輪無新工作項才准停。防「掃到夠交差就停」。**
 
@@ -316,7 +316,7 @@ Wave 規劃過程中 Claude 已經擁有完整脈絡（工作項、合約、決�
 
 > **CRITICAL: goal condition 必須寫入 wave-{id}.md 的「🎯 Goal Condition」區塊。/goal 是使用者的 CLI 指令，Claude 無法自行執行——使用者有下 /goal 就同步，沒下也以 dashboard 區塊為準，收尾時逐條自核。**
 
-**格式：** 照 `references/templates.md`「Goal Condition 模板」節逐字填入（八條＋約束），{id} 與約束代入本波實值。
+**格式：** 照 `references/templates.md`「Goal Condition 模板」節逐字填入（七條＋約束），{id} 與約束代入本波實值。
 
 ### Phase 6: 建立 Worktree → 開工
 
@@ -347,7 +347,7 @@ cd .claude/worktrees/wave-{id}
 
 **開工序列（worktree 建好後依序執行，每步缺一不可）：**
 
-1. **基線綠燈**——專案有 `scripts/hooks/wave-gate.sh` 時，跑 `bash scripts/hooks/wave-gate.sh 收尾` 當基線（涵蓋測試／typecheck／專案自定 gate，輸出帶唯一標記字串確認是本輪跑出的）；無 gate script 的專案跑一次現有測試基線。結果記進 ledger 第一行。之後任何紅燈都可歸因是本波引入還是既存問題——上波遺留的污染在開工時現形，不是收尾稽核才發現
+1. **基線綠燈**——專案有 `scripts/hooks/wave-gate.sh` 時，跑 `bash scripts/hooks/wave-gate.sh 收尾` 當基線（涵蓋測試／typecheck／專案自定 gate，輸出帶唯一標記字串確認是本輪跑出的）；無 gate script 的專案跑一次現有測試基線。結果記進 ledger 第一行。之後任何紅燈都可歸因是本波引入還是既存問題——上波遺留的污染在開工時現形，不是收尾才發現
 2. **Task 系統鏡像**——把工作項逐項 `TaskCreate`（subject = 項名，description 含合約要點），執行中用 `TaskUpdate` 推進 in_progress / completed——使用者在 UI 上看得到的即時進度層。Dashboard + ledger 仍是唯一 source of truth（版控、跨 session 持久），不一致以 dashboard 為準。環境無 TaskCreate 工具才可跳過，且須在 ledger 記一行「無 Task 工具，跳過鏡像」
 3. **輸出啟動宣告（Step 2）→ 直接開始第一個工作項**
 
@@ -451,37 +451,16 @@ cd .claude/worktrees/wave-{id}
 - 測試紅 → 先過意圖三方對齊再動手；對齊後測試仍屬錯方 → 修測試並引 requirements 依據
 - 發現自己在「猜」而不是「推導」（要寫出「應該可以」「大概是」時）→ 先停下拿證據再動手
 
-### 重大結論抗辯
-
-> **CRITICAL: 重大結論採信前必須過三鏡頭抗辯。單一模型的自我檢查會系統性偏袒自己的結論。**
-
-**觸發時機**：bug 根因判定、架構/設計選擇、安全判斷、任何會影響生產或不可逆操作依據的結論。瑣碎修改、純查證不觸發。
-
-**流程**：
-1. 把待審結論整理成自足陳述：結論一句話 + 依據證據（file:line、測試輸出）+ 影響範圍
-2. **同一則訊息平行派三個 subagent**（general-purpose，預設立場一律「推翻它」）：
-   - **skeptic（正確性）**：列出結論依賴的所有假設，逐一實查（Read/Grep/Bash），主動構造反例；理由須具體到 file:line 或可重現步驟
-   - **red-team（安全與失效）**：輸入邊界、權限與機密、競態、部分失敗髒狀態、注入面——能實查必實查
-   - **simplifier（簡潔性）**：有沒有更簡單的做法？過度工程？REFUTED 必須附具體簡化方案
-   - 回傳格式統一：`verdict: REFUTED|SURVIVED` + 具體理由。模型依「模型分層」規則選
-3. **裁決（過半存活制）**：3/3 SURVIVED → 採信；2/3 SURVIVED → 邊際存活，advisor 可用時交 advisor 終審（諮詢點 3）、不可用則採信但把 REFUTED 理由列入風險回報；≤1/3 → 結論擋回，修正後重審
-4. **規模校準**：影響生產/資料/全域佈署的重大結論 → 連續 2 輪抗辯無新 REFUTED 才收工（每輪附已審理由防重複）；其餘一輪即可
-5. 未經抗辯的重大結論只能標「**未抗辯假設**」，不得當事實陳述或作為行動依據
-
-**與其他機制分工**：收尾稽核驗**交付物**（合約輸出真偽），抗辯驗**結論**（判斷對錯）——不互相取代。與第 5 條銜接：交人裁定前先抗辯自證，呈報時附抗辯結果表。
-
-（三鏡頭抗辯流程參考自 [fable-harness](https://github.com/Miguok/fable-harness)，MIT）
-
 ### Advisor 諮詢協議
 
-> **CRITICAL: 環境有 advisor 工具時（settings 設了 advisorModel），以下四個諮詢點強制執行——advisor 是比主迴圈更強的模型，看得到完整 transcript，用在判斷成本最高的節點。工具不可用 → 各點跳過，開工時在 ledger 記一行「本波無 advisor」。**
+> **CRITICAL: 環境有 advisor 工具時（settings 設了 advisorModel），以下兩個諮詢點強制執行——advisor 是比主迴圈更強的模型，看得到完整 transcript，用在判斷成本最高的節點。工具不可用 → 各點跳過，開工時在 ledger 記一行「本波無 advisor」。**
 
-**四個諮詢點：**
+**兩個諮詢點（皆為「開工前選路」，不是「完工後複查」）：**
 
 1. **規劃完成、Phase 4 呈現前**——請 advisor 審整份計畫：掃描有無漏、合約覆蓋是否足、規模判斷是否合理。發現缺口先修再呈給使用者（省一輪人工來回）
 2. **換路煞車觸發時**（第 8 條）——換路前諮詢，附上已試方法與實際錯誤證據；advisor 指的路優先嘗試
-3. **重大結論抗辯邊際案例**——2/3 存活、或影響生產/資料的結論，抗辯後交 advisor 終審才採信
-4. **收尾稽核通過後、標「✅ 完成」前**——終檢一次（稽核驗交付物真偽，advisor 驗整體方向與遺漏）
+
+**不設收尾終檢諮詢點**：完工後再請一個模型複查交付物屬 over-verification，[官方 Opus 5 指引](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5)明列應移除。交付物真偽由合約實跑輸出與 gate script exit code 認定，不由第二個模型的意見認定。
 
 **諮詢紀律：**
 - **呼叫前先 durable**：commit / 寫檔完成後才呼叫——advisor 呼叫耗時，session 若中斷，落檔的成果還在
@@ -495,7 +474,7 @@ cd .claude/worktrees/wave-{id}
 
 | 檔案 | 性質 | 內容 |
 |------|------|------|
-| `.claude/dev/wave-{id}.md` | 進度快照（就地更新） | 工作項狀態表、合約結果、稽核結果 |
+| `.claude/dev/wave-{id}.md` | 進度快照（就地更新） | 工作項狀態表、合約結果 |
 | `.claude/dev/wave-{id}-ledger.md` | append-only 流水帳 | 每次派工/裁決/commit/錯誤一行；末尾維護 RESUME POINTER 與 ERRATA 區 |
 
 **Ledger 格式：** 見 `references/templates.md` 的「Ledger 格式」節，首次建立 ledger 檔時照格式建檔。
@@ -527,7 +506,7 @@ cd .claude/worktrees/wave-{id}
   6. 停止條件（遇到即停手回報：要動範圍外檔案、要刪東西、發現機密、與硬約束衝突）
 - **Brief 分級**：小項（單檔、合約短）→ 六要素完整內嵌 Agent prompt 即可；大項（schema 變更、跨系統、多檔）→ 必須落檔 `task-N-brief.md` 並另寫 `task-N-design.md` 過使用者 review 才動手（三件套 brief/report/design 放 worktree 的 `.superpowers/sdd/` 下——gitignored scratch 不進版控）
 - Subagent 開場指令 =「先讀你的 brief，它就是你的 requirements」（內嵌時 prompt 本身即 brief）——subagent 不依賴 controller 的對話 context
-- **模型分層**：派工時依項目性質選 model tier——機械、範圍明確的實作項 → `model: "sonnet"`；瑣碎查證/整理 → `haiku`；跨系統、架構性、難 debug 的項 → 省略（繼承 session 模型）。拿不準就省略。Reviewer 與收尾稽核的 tier 不得低於該項 implementer。**每筆派工的 ledger 條目必須帶 model tier**（例：`派工 task-3 implementer（sonnet）`），tier 切換有跡可查
+- **模型分層**：派工時依項目性質選 model tier——機械、範圍明確的實作項 → `model: "sonnet"`；瑣碎查證/整理 → `haiku`；跨系統、架構性、難 debug 的項 → 省略（繼承 session 模型）。拿不準就省略。Reviewer 的 tier 不得低於該項 implementer。**每筆派工的 ledger 條目必須帶 model tier**（例：`派工 task-3 implementer（sonnet）`），tier 切換有跡可查
 - Implementer 完成**一律**交付 report：大項寫 `task-N-report.md`；小項可改為回填鏡像 Task 的 description 或在回報訊息附完整合約輸出。controller 與 reviewer 都讀
 
 **管線不斷料（pipeline priming）：**
@@ -605,7 +584,7 @@ Subagent 回傳異常（0 tool uses、秒級返回、無 commit）→ 視為沒�
 
 #### 閘門結果影響 wave 狀態
 
-- 安全 0 high/critical + 專案 gate 全 PASS（有鉤子檔時）+ UX 審計已跑完記錄 → 品質閘門通過，進入收尾流程（標「✅ 完成」前仍須通過收尾稽核 subagent）
+- 安全 0 high/critical + 專案 gate 全 PASS（有鉤子檔時）+ UX 審計已跑完記錄 → 品質閘門通過，進入收尾流程
 - 安全有 high/critical 殘留、或專案 gate 有 FAIL → **不可標「✅ 完成」**，回去修
 - UX findings 不影響狀態流轉但必須記錄（不可跳過不跑）；觸發降級規則則只能標「✅ 完成（待 UX 補跑）」，合併協助補跑完成後才升級為「✅ 完成」（見「降級規則」）
 
@@ -662,23 +641,23 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
 
 > **CRITICAL: 完成宣告不可只看 goal condition。必須同時揭露本波未涵蓋的事項。**
 
-1. **PENDING 盤點（收尾稽核前）**——文件規定但本波未執行的後續動作（deploy/restart/發佈/通知）
+1. **PENDING 盤點**——文件規定但本波未執行的後續動作（deploy/restart/發佈/通知）
    逐一列 `PENDING: <動作> — 待使用者授權`，醒目列入完成報告（與未涵蓋事項揭露並列）——merge
    後需 deploy 的專案，deploy 指令必然出現在此行。
-2. **收尾稽核 subagent（標「✅ 完成」前強制）**——派 fresh-context 稽核 subagent（與 implementer/reviewer 都不同的新 agent），派工 prompt = 讀 `references/audit-contract.md` 全文帶入（{id} 代入本波 ID）；稽核結果寫入 `wave-{id}.md`「🕵️ 稽核結果」區塊，**有 ❌ 或漏項 → 打回修復重派稽核**，不得標「✅ 完成」。
-3. 逐條核對 wave-{id}.md「🎯 Goal Condition」區塊並打勾（(1)-(8) 全過才往下），把 `wave-{id}.md` 狀態標「✅ 完成」
+2. 逐條核對 wave-{id}.md「🎯 Goal Condition」區塊並打勾（(1)-(7) 全過才往下），把 `wave-{id}.md` 狀態標「✅ 完成」
    - **打勾必須寫回 dashboard**：核對結果以 `[x] + 一句佐證` 直接編輯進 wave-{id}.md 的 🎯 區塊、隨收尾 commit 進版控——只在對話輸出核對文字 = 沒核對
-   - **核對 (8) 不可單勾**：必須在 🎯 區塊 (8) 下方列出本波實際發生的所有停點（時點 + 原因），逐一對照「停點規則」合法清單；單句斷言（「全程僅兩停點」）不算核對。有任何一次停點不在合法清單 → (8) 不可勾，如實記錄違規
-   - **Advisor 終檢**（工具可用時）：打勾前執行「Advisor 諮詢協議」諮詢點 4，結果記 ledger；advisor 點出實質遺漏 → 處理完才標「✅ 完成」
+   - **核對 (7) 不可單勾**：必須在 🎯 區塊 (7) 下方列出本波實際發生的所有停點（時點 + 原因），逐一對照「停點規則」合法清單；單句斷言（「全程僅兩停點」）不算核對。有任何一次停點不在合法清單 → (7) 不可勾，如實記錄違規
+   - **不派稽核 subagent 複驗交付物**：合約實跑輸出、gate script exit code、安全/UX 閘門記錄就是交付物真偽的認定依據。再派一個 agent 重跑一遍屬 over-verification，[官方 Opus 5 指引](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5)明列應移除
    - **消化掉的 backlog 項改為 `done:{wave-id}`**
-4. **未涵蓋事項揭露**（每波必做）：
+3. **未涵蓋事項揭露**（每波必做）：
+   - **漏項回掃**：回掃 `docs/requirements/` 找有 🔴🟡❓ 但無對應工作項的項目，一律列入清單（含被標「已知延後」「使用者未裁定」的項）——只報事實，延後正當性由使用者判斷。這一步驗的是「有沒有沒做的事」，不是重驗已做的事
    - 讀取本波期間 append 到 `.claude/dev/inbox.md` 的項目（`from: grill:*` 與執行中冒出的）
    - 在完成報告中**醒目列出**，每筆一行：內容 ＋ 為何本波不做
    - 零項時明確寫：「✅ 本波涵蓋所有 grill/spec 決策，執行中無新增未處理事項。」
    - **這段在 goal condition 判定之外**——即使 goal 全綠，未涵蓋事項仍需揭露
    - 未裝 intake kit 的專案：改讀本波 dashboard 的「未涵蓋決策」區
-5. 提示使用者「本波完成，可以 merge 回 main」
-6. **merge 後清除本波產物**（`bash <kit>/scripts/wave-close.sh {id}`）——波的 dashboard 與
+4. 提示使用者「本波完成，可以 merge 回 main」
+5. **merge 後清除本波產物**（`bash <kit>/scripts/wave-close.sh {id}`）——波的 dashboard 與
    ledger 在 merge 之後對未來沒有價值，內容留在 git history 即可。腳本會驗證每個檔都已提交
    且無未提交修改（任一不符即中止），把 `git show` 取回指令寫進 `wave-INDEX.md`，再 `git rm`
    dashboard＋ledger＋同 wave_id 的 spec/plan。先跑 `--dry-run` 確認範圍，刪除與 INDEX 一起 commit。
@@ -687,7 +666,7 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
    - 尚未 merge 就不要清——還沒進 main 的內容，`git show` 只拿得到 branch 上的版本。
    - **為什麼是當場清、而不是標記等歸檔**：舊設計要求收尾寫 frontmatter（`status: done` +
      `closed`），交由 `Stop` hook 的 `archive.sh` 在 N 天後刪除。2026-07-25 實測 dfaa 的 52 個
-     `wave-*.md`：**0 個有 frontmatter**，包含當天剛完成、走完整流程且收尾稽核 VERIFIED 的
+     `wave-*.md`：**0 個有 frontmatter**，包含當天剛完成、走完整流程且閘門全綠的
      5 個波。條文寫得再明確也沒被執行，於是熱區只增不減。改成呼叫一個指令，消掉兩個失敗點：
      收尾者要記得寫且格式要對、hook 要在 N 天後正確觸發。`archive.sh` 仍在，角色降為漏網補救。
 
