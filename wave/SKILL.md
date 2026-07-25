@@ -482,7 +482,7 @@ cd .claude/worktrees/wave-{id}
 
 **Ledger 使用規則：**
 - **每次派工、裁決、commit、錯誤後立即 append 一行**——不等收尾才補
-- **ERRATA**：controller 犯錯（誤送訊息、漏跑合約、錯判狀態）→ 記一行「教訓：...」。之後每個心跳 prompt（見 Subagent-Driven 長跑協議）必須帶上全部 ERRATA 條目——一次性錯誤變永久約束
+- **ERRATA**：controller 犯錯（誤送訊息、漏跑合約、錯判狀態）→ 記一行「教訓：…」，Subagent-Driven 的心跳 prompt 每次帶上全部條目。**回灌只在本波內、且只在心跳路徑生效**——Inline 執行、compaction 之後、下一波都讀不到它。所以「記了就算處理完」是假的：收尾必須跑 ERRATA 升級判定（收尾流程步驟 4）逐條決定去留，不得留在 ledger 等歸檔（`wave-close.sh` 會連 ledger 一起刪）
 - **暫停意圖外部化**：使用者下節流/暫停指令（「usage 快爆了先停」）→ 讓 in-flight 工作跑完、不派新工作，並把暫停意圖寫進 ledger，防止喚醒後誤判為斷線而繼續派工。使用者說「可以繼續」才清除
 
 **中斷恢復協議（git 為準）：**
@@ -657,7 +657,13 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
    - 零項時明確寫：「✅ 本波涵蓋所有 grill/spec 決策，執行中無新增未處理事項。」
    - **這段在 goal condition 判定之外**——即使 goal 全綠，未涵蓋事項仍需揭露
    - 未裝 intake kit 的專案：改讀本波 dashboard 的「未涵蓋決策」區
-4. 提示使用者「本波完成，可以 merge 回 main」
+4. **ERRATA 升級判定**（ledger 有 ERRATA 條目時必做；須在 merge 與 `wave-close.sh` 之前——ledger 一刪教訓就沒了）：逐條走三問，**全過才算升級候選**，任一不過即按該問的去向處理，不留在 ledger 等歸檔：
+   - **Q1 會再犯嗎？**（同型已發生 ≥2 次，或有明確重複條件）→ 否＝一次性手滑，**丟掉不留**
+   - **Q2 機器擋得住嗎？** → 是＝寫成 gate script／lint／測試，append 一行到 `.claude/dev/inbox.md`（`from: errata:{wave-id}`，內容寫「補 gate: …」），**不進 CLAUDE.md**
+   - **Q3 讀了會改變行為嗎？**（不是「知道就好」的常識）→ 是＝append 到 inbox 標「升級候選: CLAUDE.md」，實際落點由 `/triage` 裁定；否＝丟掉
+   - 零條升級時在完成報告明寫「ERRATA N 條，全數判定為一次性，未升級」——沒寫＝沒判定
+   - 未裝 intake kit 的專案：改 append 到本波 dashboard 的「未涵蓋決策」區
+5. 提示使用者「本波完成，可以 merge 回 main」
 5. **merge 後清除本波產物**（`bash <kit>/scripts/wave-close.sh {id}`）——波的 dashboard 與
    ledger 在 merge 之後對未來沒有價值，內容留在 git history 即可。腳本會驗證每個檔都已提交
    且無未提交修改（任一不符即中止），把 `git show` 取回指令寫進 `wave-INDEX.md`，再 `git rm`

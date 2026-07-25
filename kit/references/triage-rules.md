@@ -14,6 +14,7 @@
 | Claude 自查發現、跑測試抓到 | 判斷完成 → **backlog** | 發現當下就在讀那份 code，對帳成本近乎零 |
 | wave grill 未涵蓋的決策 | 判斷完成 → **backlog** | grill 過程已經釐清規模與影響面 |
 | 另一個 session 主動加的工作 | 判斷完成 → **backlog** | 它有時間做完整判斷，不需要繞一圈 |
+| wave 收尾的 ERRATA 升級候選（`from: errata:*`） | **inbox** | 走專屬判定（見 4.5），不套 type／flow 判斷樹 |
 
 直接寫 backlog 時，仍要走完步驟 1–4 的判斷（只是省掉「先落 inbox 再回頭處理」那一趟），並在明細區的 `from` 欄註明來源（例：`from: 自查（wave-intake-kit 執行中）`）。
 
@@ -75,6 +76,36 @@ grep -rn "<關鍵詞>" <spec_layer>
 例：一個 SPEC_CHANGE 若只改一個預設值，是 `type: SPEC_CHANGE`＋`status: ⚠️需客戶確認`＋`flow: direct` ——客戶確認過後直接進 wave 做掉，不需要寫 spec。一個 BUG 若要動 5 個檔並改資料模型，是 `type: BUG`＋`flow: spec`。
 
 `flow: direct` 的工作項**不需要**先走 brainstorming。這不是在合理化跳過流程——分流判定已在 triage 階段完成，重複 brainstorming 只會產生無人閱讀的 spec 並加劇文件堆積。
+
+## 4.5 ERRATA 升級判定（`from: errata:*` 專用）
+
+wave ledger 的 ERRATA 條目在 `wave-close.sh` 之後就不存在了，且它的回灌機制只覆蓋
+Subagent-Driven 的心跳 prompt——Inline 執行、compaction 後、下一波都讀不到。收尾時
+帶著三問的判定結果落到 inbox，triage 在此決定最終落點。
+
+**這些項不套步驟 1–4 的 type／flow 判斷樹**（教訓不是規格條目，對不到 matrix），直接走下表：
+
+| 判定 | 落點 | 動作 |
+|---|---|---|
+| 補 gate（收尾 Q2 判為機器可擋） | `backlog.md` | `type: CHORE`＋`flow` 照規模判；`raw` 寫清楚擋什麼、擋在哪一層（gate script／lint rule／測試） |
+| 升級候選: CLAUDE.md（收尾 Q1+Q3 全過） | 專案 `CLAUDE.md` | 見下方收錄規則 |
+| 收尾未附判定結果 | — | 退回：在 inbox 標 `status: ⚠️缺判定`，要求補三問結果再處理，**不代為判斷** |
+
+### 收錄進 CLAUDE.md 的規則
+
+**不開固定 ERRATA 區段。** 寫進主題最近的既有段落（Shell 操作類寫進操作鐵則、測試類寫進
+測試策略），沒有對得上的段落才新開——固定空間會誘發填空衝動，且 CLAUDE.md 每個 session
+都要載入，只增不減必然劣化成噪音。
+
+每條收錄必須具備，缺一不收：
+
+1. **日期**（`YYYY-MM-DD`）與**具體案例**（哪個波、什麼操作、錯成什麼樣）
+2. **違反後果**——讀者要知道代價才會遵守，「請注意 X」沒有約束力
+3. **可執行的正確做法**——不是「要小心」，是「改用 `$queryRaw(Prisma.sql\`…\`)`」
+
+**加一減一：** 每收一條，同時檢查同段落有無已失效的舊條（機制已改、工具已換、連續三個月沒
+再犯的一次性教訓）→ 有就刪，並在 triage 摘要列出刪除項。CLAUDE.md 沒有行數硬閘門，這條
+是唯一的收縮力。
 
 ## 5. 非回饋內容
 
