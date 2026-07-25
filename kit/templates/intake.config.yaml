@@ -1,0 +1,13 @@
+# intake kit 專案配置。留空的欄位會觸發對應功能降級（降級須在輸出明示）。
+
+# 規格真理層路徑。無此層的專案留空 → triage 跳過對帳，不產 SPEC_CHANGE。
+spec_layer: ""
+
+# 專案的規格閘門指令（選填，triage 後可據此提醒）
+spec_check: ""
+
+hot_zone_limit: 20      # .claude/dev/ 熱區 .md 檔數上限
+inbox_alert: 8          # 未整理筆數告警線
+stale_days: 60          # backlog ready 項多久算 stale
+archive_after_days: 7   # wave done 後多久自動歸檔
+archive_root: .claude/dev/archive
