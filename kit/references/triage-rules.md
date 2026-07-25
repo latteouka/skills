@@ -2,6 +2,23 @@
 
 對 `inbox.md` 中每一筆 `## INB-NNN` 執行下列步驟，結果寫入 `backlog.md`。
 
+## 0. 兩個入口——分界是「判斷完成了沒」，不是「誰寫的」
+
+**能填得出 `type` / `flow` / `matrix` 三個欄位 → 直接寫 `backlog.md`，跳過 inbox。**
+**填不出來（或當下沒時間查證）→ 寫 `inbox.md`，等 triage。**
+
+| 來源 | 走哪 | 為什麼 |
+|---|---|---|
+| 使用者隨口講、聊天中冒出的 bug | **inbox** | 捕捉必須零摩擦——當下停下來 grep matrix 是打斷對話 |
+| 逐字稿彙整、客戶回饋 | **inbox** | 尚未與 matrix 對帳，無法判定 BUG／SPEC_CHANGE／NEW |
+| Claude 自查發現、跑測試抓到 | 判斷完成 → **backlog** | 發現當下就在讀那份 code，對帳成本近乎零 |
+| wave grill 未涵蓋的決策 | 判斷完成 → **backlog** | grill 過程已經釐清規模與影響面 |
+| 另一個 session 主動加的工作 | 判斷完成 → **backlog** | 它有時間做完整判斷，不需要繞一圈 |
+
+直接寫 backlog 時，仍要走完步驟 1–4 的判斷（只是省掉「先落 inbox 再回頭處理」那一趟），並在明細區的 `from` 欄註明來源（例：`from: 自查（wave-intake-kit 執行中）`）。
+
+**判斷不完整就不要硬填**——填錯的 `flow` 會讓大改動溜進 `direct` 而略過設計階段，比多繞一趟 inbox 貴得多。
+
 ## 1. 定位規格條目
 
 ```bash
