@@ -55,9 +55,13 @@ tmp="$(mktemp)"
 
     printf '\n## 歷史索引\n\n'
     if [ -f "${dev}/wave-INDEX.md" ]; then
-        # 計算 INDEX 中資料列數（每個波必定有取回指令 `git show`）
-        # 期間欄格式多樣（YYYY~YYYY、單日期、?、unknown 等），唯一可靠依據是取回欄都有 `git show`
-        count="$(grep -c 'git show' "${dev}/wave-INDEX.md" 2>/dev/null || echo 0)"
+        # 計算 INDEX 中資料列數（複合條件：表格行 + 取回指令）
+        # 單一條件失效情境：
+        # - git show 出現在說明文字（多算）
+        # - ^| 匹配表頭（多算）
+        # - 分隔線無法完全排除（結構差異）
+        # 必須同時要求「行首為 | 」與「含 git show」才能精確識別資料列
+        count="$(grep -c '^|.*git show' "${dev}/wave-INDEX.md" 2>/dev/null || echo 0)"
         if [ "$count" -gt 0 ]; then
             printf '已刪除 %d 個完成的波。\n\n' "$count"
             printf '內容存於 `wave-INDEX.md`；各波取回指令已記錄在該檔案的「取回」欄。\n\n'
