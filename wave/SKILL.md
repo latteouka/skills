@@ -1,6 +1,6 @@
 ---
 name: wave
-description: 規劃並啟動一波開發波次（純開發引擎）。適用於：開始一輪多工作項的開發、從 requirements 或回饋批次排工作、查看或放棄進行中的波。觸發詞：/wave、開新波、新一波、plan wave、啟動開發；子指令 /wave status、/wave drop {id}。
+description: 規劃並啟動一波開發波次（純開發引擎）。適用於：開始一輪多工作項的開發、從 requirements 或回饋批次排工作、查看或放棄進行中的波。觸發詞：/wave、開新波、新一波、plan wave、啟動開發；子指令 /wave batch（讀 backlog 批次規劃多波、產全部 wave prompt）、/wave status、/wave drop {id}。
 argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方向"
 ---
 
@@ -706,6 +706,19 @@ Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由�
 2. 每個波只讀寫自己的 `wave-{id}.md`
 3. `playwright-guide.md` 併發寫入處理：每個 worktree 維護自己的副本，merge 回 main 時自動合併（append-only 格式天然可合併）
 4. `prisma/schema.prisma` 等共用檔案的衝突在 merge 階段處理（見合併協助段落）
+
+### `/wave batch` — 批次規劃多波（backlog 一次排完）
+
+使用者說「讀 backlog 看能開幾波」「全部排波」「一次給我所有 wave prompt」＝進本模式。
+
+1. **取料**：讀 `backlog.md` 全部 `ready` 項（⚠️ 硬閘門照舊：`⚠️需客戶確認` 不取）
+2. **分波**：依每項預期動到的檔案範圍分組——不相交的組＝可並行各開一波；相交的項合進同一波；
+   有依賴關係的標啟動順序（後波在前波 merge 後開）。分組結果連同「預測交集」表先給使用者過目
+   （此時無 commit 可 diff，交集是預測非實測，標明）
+3. **逐波產出**：每波各走 Phase 3～5（工作項＋合約＋dashboard `wave-{id}.md`＋session prompt
+   ＋goal condition）——batch 只改「一次規劃幾波」，不簡化任何單波的管線
+4. **總表收尾**：波數、每波一句話範圍、建議啟動順序、可同時開的組合。使用者拿各 prompt
+   分別開 session；各 session 開場的多波感知 hook（wave-awareness）會自動接手實測交集
 
 ### `/wave status` — 全局概覽
 
