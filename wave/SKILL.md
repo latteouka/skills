@@ -121,21 +121,33 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 
 > 掃描必須在 Align（Phase 0 Step 3 / Phase 1）**之後**執行——新素材要先落檔 requirements 才掃得到，順序顛倒會掃到舊狀態。Phase 0 不預跑掃描。
 
-**`--from <來源>` 參數（回饋批次）：** 使用者以 `/wave --from` 指定輸入來源（驗收台 issue、LINE 回報、bug 清單等 triage 結果）時，本 Phase 的來源 1/2/4 掃描改為「指定來源清單逐項帶追蹤來源編號」，來源 3（舊 wave 延後決策）照掃。**其餘管線完全相同**——grill、五角度合約、REUSE/TWINS/INTENT、🔒 安全步驟、E2E 責任制、品質閘門、收尾稽核、goal condition 全部照走，不因「只是小修」降級任何規則。與 CONTEXT.md／requirements 矛盾的項在 grill 中裁定，不默默改。
+**`--from <來源>` 參數（回饋批次）：** 使用者以 `/wave --from` 指定輸入來源（驗收台 issue、LINE 回報、bug 清單等 triage 結果）時，本 Phase 的來源 1/2/4 掃描改為「指定來源清單逐項帶追蹤來源編號」，來源 3（收件匣未整理項，觸發 inbox→backlog 自動 triage）照掃。**其餘管線完全相同**——grill、五角度合約、REUSE/TWINS/INTENT、🔒 安全步驟、E2E 責任制、品質閘門、收尾稽核、goal condition 全部照走，不因「只是小修」降級任何規則。與 CONTEXT.md／requirements 矛盾的項在 grill 中裁定，不默默改。
 
 > **CRITICAL: 掃描完備優先於掃描速度。四個來源各掃一輪後再掃一輪，連續兩輪無新工作項才准停。防「掃到夠交差就停」。**
+
+> **開波前自動 triage（不停、不問，不算「停點規則」新停點）：** 來源 3（收件匣未整理項）若 > 0，先讀
+> `~/projects/skills/kit/references/triage-rules.md` 全文並對 `.claude/dev/inbox.md` 執行 triage（結果寫入
+> `.claude/dev/backlog.md`），再回頭掃來源 1。此步驟與其餘來源掃描同屬 Phase 2 自動執行範圍，開波本身即
+> 代表要取料，不因此產生新的等待輸入節點。`triage-rules.md` 不存在的專案（未裝 intake kit）→ 略過本段，
+> 四來源掃描照舊執行。
+>
+> **⚠️ 硬閘門：** `status: ⚠️需客戶確認` 的 backlog 項不得取用排波，即使使用者說「全部做完」。該項需
+> 人工改為 `ready` 或 `dropped` 才可取。
+>
+> **分流：** 取用的項依其 `flow` 欄位處理——`direct` 直接排成工作項；`spec` 需先走 `/brainstorming`
+> （呼應下方 Phase 2.5 加碼判斷）。
 
 自動執行（不問使用者），四個來源：
 
 ```bash
-# 來源 1：requirements 未完成項
-find docs/requirements/ -name "*.md" -exec grep -l "🔴\|🟡\|❓" {} \;
+# 來源 1：backlog 待排波項（取代已退役的 docs/requirements/）
+grep -E '\| (ready) \|' .claude/dev/backlog.md 2>/dev/null
 
 # 來源 2：程式內待辦標記
 grep -rn "TODO\|FIXME" src/ lib/ app/ 2>/dev/null | head -50
 
-# 來源 3：所有舊 wave 的延後決策
-grep -A 20 "📋 延後決策" .claude/dev/wave-*.md 2>/dev/null
+# 來源 3：收件匣未整理項（開波前已自動 triage 併入 backlog，見上方說明）
+grep -c '^## INB-' .claude/dev/inbox.md 2>/dev/null
 
 # 來源 4：git log 近況（找做一半的工作）
 git log --oneline -20
@@ -667,6 +679,18 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
    - **打勾必須寫回 dashboard**：核對結果以 `[x] + 一句佐證` 直接編輯進 wave-{id}.md 的 🎯 區塊、隨收尾 commit 進版控——只在對話輸出核對文字 = 沒核對
    - **核對 (8) 不可單勾**：必須在 🎯 區塊 (8) 下方列出本波實際發生的所有停點（時點 + 原因），逐一對照「停點規則」合法清單；單句斷言（「全程僅兩停點」）不算核對。有任何一次停點不在合法清單 → (8) 不可勾，如實記錄違規
    - **Advisor 終檢**（工具可用時）：打勾前執行「Advisor 諮詢協議」諮詢點 4，結果記 ledger；advisor 點出實質遺漏 → 處理完才標「✅ 完成」
+   - **收尾必填 frontmatter**：標「✅ 完成」的同時，在 `wave-{id}.md` 檔首寫入 frontmatter：
+     ```yaml
+     ---
+     wave_id: {id}
+     status: done
+     opened: YYYY-MM-DD
+     closed: YYYY-MM-DD
+     backlog_items: [B-042, B-043]
+     ---
+     ```
+     並把消化掉的 backlog 項改為 `done:{wave-id}`。**未填 `status` 與 `closed` 者，`Stop` hook 的自動歸檔
+     不會處理，該波會永久留在熱區**——這不是格式建議，是歸檔機制能否辨識本波的前提。
 4. **延後決策揭露**（每波必做——grill 已無條件執行）：
    - 讀取 wave-{id}.md 的「📋 延後決策」區塊
    - 在完成報告中**醒目列出**所有延後項，揭露格式讀 `references/templates.md`『延後決策揭露範例』節照填。
