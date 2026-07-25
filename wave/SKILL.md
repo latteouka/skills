@@ -180,7 +180,7 @@ git log --oneline -20
 
 > **CRITICAL: 規模與時長脫鉤。工作項數量以完整覆蓋為準，禁止以「session 會太長」「先做核心」「這波先做一部分」為由在規劃期縮範圍。真 blocker 在該項旁標註原因交使用者裁定。**
 
-**交集分析（多波時）：** 如果 Phase 0 偵測到其他進行中的波，對比本波工作項預期動到的檔案與其他波的涉及檔案。有交集的記錄下來，Phase 4 會顯示預警。
+**交集分析（多波時）：** 如果 Phase 0 偵測到其他進行中的波，跑 `bash <kit>/scripts/wave-registry.sh intersect`——它對每對活躍 worktree 以 `git diff --name-only <base>...HEAD` 算實際改動交集，並用 merge-tree 預演分級（可自動合併／需裁定）。本波尚未建 worktree 時，把本波工作項預期動到的檔案與 `intersect` 列出的他波改動集人工對照。結果記錄下來，Phase 4 顯示預警。
 
 ### Phase 2.5: 無條件 grill-me ＋ 判斷是否加碼 brainstorming
 
@@ -284,19 +284,19 @@ git log --oneline -20
 
 > `/ui-test` 不再對「任何前端工作項」必推——blocking 級把關已由每個 UI 項合約內建的 smoke 三斷言承擔（見「E2E 驗證責任制」）。ui-test 的定位是探索性掃描，只在新增大量 UI 面時值得跑；一般修改波不排它，跳過不需寫理由。
 
-**檔案交集預警（多波時）：** 只在**規劃階段**（本 Phase）顯示一次，且只列「同一個函式／同一段邏輯」層級的重疊：
+**檔案交集預警（多波時）：** 只在**規劃階段**（本 Phase）顯示一次。以 `bash <kit>/scripts/wave-registry.sh intersect` 的輸出為準——只列它標「⚠️ 需裁定」的檔（exit 1 ＝ 有需裁定交集），標「可自動合併」的不列：
 
 > ## ⚠️ 檔案交集預警
 >
-> | 檔案 | 與哪波重疊 | 該波狀態 |
-> |------|-----------|---------|
-> | prisma/schema.prisma | orders-api | 🟡 執行中 |
+> | 檔案 | 與哪波重疊 | 該波狀態 | 分級理由 |
+> |------|-----------|---------|---------|
+> | prisma/schema.prisma | orders-api | 🟡 執行中 | merge-tree 衝突——同段邏輯 |
 >
 > 本波將在獨立 worktree 中執行，合併時 Claude 會協助處理衝突。
 
-不阻擋，純資訊。無交集時不顯示。
+不阻擋，純資訊。`intersect` exit 0（無需裁定交集）時不顯示。
 
-**下列重疊不列入預警**（列了只是噪音）：append-only 檔（`wave-INDEX.md`、ledger、inbox）、`.gitignore`／設定檔各自加行、兩邊各自新增獨立函式或區塊、格式與 lint 造成的差異。判準是「merge 時需不需要使用者裁定改法」——不需要就不提。
+分級判準（腳本內建，判準＝「merge 時需不需要使用者裁定改法」）：append-only 檔（`wave-INDEX.md`、ledger、inbox）與「兩邊各自加行／各自新增獨立區塊」（merge-tree 預演可自動合，或衝突但兩邊皆純加行）標可自動合併；同一行／同段邏輯衝突、兩邊各自新建同名檔標需裁定。
 
 > **CRITICAL: 執行期不主動報交集。** Phase 4 之後、直到收尾為止，**不因為讀到某個檔就回頭提「這裡可能跟別的波衝突」**。使用者的原話：「你會幫我處理 merge，但有時候是你自己發現有衝突提早在講」——那類提醒時機隨機、資訊零碎、且多數是假警報（實測：現存唯一交集是 `wave-INDEX.md`，merge-tree 顯示 41 處衝突，但兩邊都是純 append，三秒可解）。
 >
@@ -744,7 +744,7 @@ Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由�
 
 任何時候可呼叫，動態掃描所有波次狀態：
 
-**資料來源：** `git worktree list` + 各 worktree / main 的 `.claude/dev/wave-*.md`。
+**資料來源：** `bash <kit>/scripts/wave-registry.sh list`（branch、已改檔數、未 commit 數、最後 commit 時間）+ 各 worktree / main 的 `.claude/dev/wave-*.md`。
 
 輸出格式見 `references/templates.md` 的「`/wave status` 輸出範例」節，動態填入實際掃描結果。
 
