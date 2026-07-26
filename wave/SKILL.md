@@ -51,7 +51,7 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 
 ## 外部 Skill 缺席降級
 
-本 skill 依賴的外部 skill：訪談 `/grill-me`、`/grill-with-docs`、`/brainstorming`；安全 `/insecure-defaults`、`/sharp-edges`、`/semgrep`；UX `/ui-test`、`/wcag-accessibility-audit`、`/nielsen-heuristics-audit`、`/ux-audit-rethink`。任一在環境中不存在時，與原生工具 fallback 同 pattern 降級——缺席不得靜默跳過，也不得卡死流程：
+本 skill 依賴的外部 skill：諮詢 `/askfable`；訪談 `/grill-me`、`/grill-with-docs`、`/brainstorming`；安全 `/insecure-defaults`、`/sharp-edges`、`/semgrep`；UX `/ui-test`、`/wcag-accessibility-audit`、`/nielsen-heuristics-audit`、`/ux-audit-rethink`。任一在環境中不存在時，與原生工具 fallback 同 pattern 降級——缺席不得靜默跳過，也不得卡死流程：
 
 - ledger 記一行「無 {skill}，該步降級」；合約/閘門對應步驟標 `SKIPPED(不可用)`，視同「已執行並記錄」過閘（goal condition (3) 的安全/UX 判定同此認定）
 - 收尾報告以「品質 caveat」區醒目列出所有 SKIPPED 步驟——降級是誠實揭露，不是豁免
@@ -447,27 +447,40 @@ cd .claude/worktrees/wave-{id}
 - 恢復前 controller 親自驗證依賴可達（實跑連線指令取證，不憑推測），驗證過才恢復；恢復用 SendMessage 續跑原 agent，附上環境現況與已驗證證據
 
 **8. 換路煞車**
-- 同一方法連續失敗 **2 次** → 停止重試，換方法或回頭重蒐證——不是第 3 次重試。換路前先諮詢 advisor（見「Advisor 諮詢協議」諮詢點 2）
-- 蹺蹺板偵測：修 A 壞 B、修 B 又壞 A → 退回起點重新定位根因（你在治標不治本）
+- 同一方法連續失敗 **2 次** → 停止重試，換方法或回頭重蒐證——不是第 3 次重試。換路前先諮詢 Fable（見「Fable 諮詢協議」諮詢點 2）
+- 蹺蹺板偵測：修 A 壞 B、修 B 又壞 A → 退回起點重新定位根因（你在治標不治本）。蹺蹺板也觸發諮詢點 2
 - 測試紅 → 先過意圖三方對齊再動手；對齊後測試仍屬錯方 → 修測試並引 requirements 依據
 - 發現自己在「猜」而不是「推導」（要寫出「應該可以」「大概是」時）→ 先停下拿證據再動手
 
-### Advisor 諮詢協議
+### Fable 諮詢協議（askfable）
 
-> **CRITICAL: 環境有 advisor 工具時（settings 設了 advisorModel），以下兩個諮詢點強制執行——advisor 是比主迴圈更強的模型，看得到完整 transcript，用在判斷成本最高的節點。工具不可用 → 各點跳過，開工時在 ledger 記一行「本波無 advisor」。**
+> **CRITICAL: 透過 `/askfable` skill 派 fable-advisor agent 取得獨立第二意見——繞過壞掉的 server-side advisor tool。以下四個諮詢點在判斷成本最高的節點觸發。`/askfable` 不可用（skill 缺席或主 session 已是 Fable）→ 各點跳過，開工時在 ledger 記一行「本波無 Fable 諮詢」。**
 
-**兩個諮詢點（皆為「開工前選路」，不是「完工後複查」）：**
+**架構差異（vs 舊 advisor）：** fable-advisor 是 fresh agent，看不到主 session transcript——但有 Read/Grep/Bash 工具，可獨立讀檔、跑指令驗證。這是升級不是降級：它給的是**未被主迴圈 framing 污染的獨立意見**。所有脈絡必須組裝進 prompt 或落檔讓 agent 自行 Read。
 
-1. **規劃完成、Phase 4 呈現前**——請 advisor 審整份計畫：掃描有無漏、合約覆蓋是否足、規模判斷是否合理。發現缺口先修再呈給使用者（省一輪人工來回）
-2. **換路煞車觸發時**（第 8 條）——換路前諮詢，附上已試方法與實際錯誤證據；advisor 指的路優先嘗試
+**四個諮詢點（皆為「人工 review 前」或「判斷已被污染時」，不是「完工後複查」）：**
 
-**不設收尾終檢諮詢點**：完工後再請一個模型複查交付物屬 over-verification，[官方 Opus 5 指引](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5)明列應移除。交付物真偽由合約實跑輸出與 gate script exit code 認定，不由第二個模型的意見認定。
+1. **規劃完成、Phase 4 呈現前**——先把計畫草稿落到 scratch 檔，派 fable-advisor 獨立審查。Prompt 指示 Fable：
+   - 自己跑一輪 Phase 2 四來源掃描指令，列出「我掃到但你清單上沒有」的項（獨立驗證 loop-until-dry）
+   - 抽查合約：預期輸出是否具體、覆蓋場景缺不缺 edge/誤用/守恆
+   - 規模與依賴排序是否合理
+   - **防違規建議 guard**：Fable 意見中違反 Core Principles 的建議（縮範圍、加停點、禁語句型）→ 記 ledger「Fable 建議 X，違反〈禁止端出縮減版〉，不採納」，規模疑慮的合法出口是 Checkpoint 分段
+   - 發現缺口先修再呈給使用者（省一輪人工來回）
+
+2. **換路煞車觸發時**（第 8 條，含蹺蹺板偵測）——Prompt 紀律遵循 askfable 防 anchoring 規則：附「試過什麼＋實際錯誤輸出＋相關檔案路徑」（事實），**不附「我猜根因是 X」**（污染源）。Fresh context 在此反而是升級——不繼承主迴圈的錯誤假設。Fable 指的路優先嘗試。Subagent-Driven 時：implementer 觸發煞車停手回報，**由 controller 諮詢**再 SendMessage 帶結論續跑原 agent。意見衝突時用 SendMessage 追問同一 agent（保脈絡），不重派
+
+3. **大項 design review**（Subagent-Driven 執行期，`task-N-design.md` 落檔後、呈使用者 review 前）——僅 Brief 分級為「大項」（schema 變更、跨系統、多檔）時觸發，一波 0-2 次。Fable 直接 Read `.superpowers/sdd/task-N-design.md`，脈絡組裝成本近零。問：設計與現有 schema/架構的相容性、遷移風險、被否決的替代案是否真該否決、該項合約能否驗到設計宣稱的行為
+
+4. **`/wave batch` 分波結果審查**（分組＋預測交集表呈使用者過目前）——一次 batch 一次呼叫。問：檔案範圍分組有無漏算的相交、依賴順序有無成環或顛倒、「可並行組合」是否高估
+
+**不設收尾終檢諮詢點**：完工後再請一個模型複查交付物屬 over-verification，[官方 Opus 5 指引](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5)明列應移除。交付物真偽由合約實跑輸出與 gate script exit code 認定，不由第二個模型的意見認定。**逐項 commit 前也不諮詢**——N 項 × 30-90 秒，且與 reviewer 親自重跑合約完全重複。
 
 **諮詢紀律：**
-- **呼叫前先 durable**：commit / 寫檔完成後才呼叫——advisor 呼叫耗時，session 若中斷，落檔的成果還在
-- **不默默改道**：advisor 意見與既有證據衝突時，帶著證據再問一輪（「我查到 X，你建議 Y，哪個約束決勝？」），不悄悄換方向也不悄悄無視
-- **每次諮詢記 ledger 一行**：`[HH:MM] advisor 諮詢點 N：{採納/反駁+理由一句}`
-- Advisor 是工具呼叫、不是停點——執行期間照常，不違反唯一停點制
+- **呼叫前先 durable**：計畫草稿或 design doc 落檔後才呼叫——askfable 耗時 30-90 秒，session 若中斷，落檔的成果還在；諮詢點 1 因 Phase 4 前尚無 commit，改落 scratch 檔
+- **不默默改道**：Fable 意見與既有證據衝突時，用 SendMessage 對同一 agent 追問（「我查到 X，你建議 Y，哪個約束決勝？」），不悄悄換方向也不悄悄無視
+- **每次諮詢記 ledger 一行**：`[HH:MM] askfable 諮詢點 N：{採納/反駁+理由一句}`
+- askfable 是 Agent tool 呼叫、不是停點——執行期間照常，不違反唯一停點制
+- **缺席降級**：比照「外部 Skill 缺席降級」pattern——ledger 一行、不卡流程
 
 ### 狀態外部化——Dashboard + Ledger 雙層
 
@@ -505,7 +518,7 @@ cd .claude/worktrees/wave-{id}
   4. 硬約束（不可碰的檔案/目錄，如其他波涉及範圍）
   5. 非目標（明確不做的事，至少一條——防順手改、防 scope 蔓延）
   6. 停止條件（遇到即停手回報：要動範圍外檔案、要刪東西、發現機密、與硬約束衝突）
-- **Brief 分級**：小項（單檔、合約短）→ 六要素完整內嵌 Agent prompt 即可；大項（schema 變更、跨系統、多檔）→ 必須落檔 `task-N-brief.md` 並另寫 `task-N-design.md` 過使用者 review 才動手（三件套 brief/report/design 放 worktree 的 `.superpowers/sdd/` 下——gitignored scratch 不進版控）
+- **Brief 分級**：小項（單檔、合約短）→ 六要素完整內嵌 Agent prompt 即可；大項（schema 變更、跨系統、多檔）→ 必須落檔 `task-N-brief.md` 並另寫 `task-N-design.md`，**落檔後先派 `/askfable` 審查**（諮詢點 3），再呈使用者 review 才動手（三件套 brief/report/design 放 worktree 的 `.superpowers/sdd/` 下——gitignored scratch 不進版控）
 - Subagent 開場指令 =「先讀你的 brief，它就是你的 requirements」（內嵌時 prompt 本身即 brief）——subagent 不依賴 controller 的對話 context
 - **模型分層**：派工時依項目性質選 model tier——機械、範圍明確的實作項 → `model: "sonnet"`；瑣碎查證/整理 → `haiku`；跨系統、架構性、難 debug 的項 → 省略（繼承 session 模型）。拿不準就省略。Reviewer 的 tier 不得低於該項 implementer。**每筆派工的 ledger 條目必須帶 model tier**（例：`派工 task-3 implementer（sonnet）`），tier 切換有跡可查
 - Implementer 完成**一律**交付 report：大項寫 `task-N-report.md`；小項可改為回填鏡像 Task 的 description 或在回報訊息附完整合約輸出。controller 與 reviewer 都讀
@@ -699,7 +712,7 @@ Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由�
 
 1. **取料**：讀 `backlog.md` 全部 `ready` 項（⚠️ 硬閘門照舊：`⚠️需客戶確認` 不取）
 2. **分波**：依每項預期動到的檔案範圍分組——不相交的組＝可並行各開一波；相交的項合進同一波；
-   有依賴關係的標啟動順序（後波在前波 merge 後開）。分組結果連同「預測交集」表先給使用者過目
+   有依賴關係的標啟動順序（後波在前波 merge 後開）。分組結果連同「預測交集」表**先派 `/askfable` 審查**（諮詢點 4：檔案範圍分組有無漏算的相交、依賴順序有無成環或顛倒、「可並行組合」是否高估），修正後再呈使用者過目
    （此時無 commit 可 diff，交集是預測非實測，標明）
 3. **逐波產出**：每波各走 Phase 3～5（工作項＋合約＋dashboard `wave-{id}.md`＋session prompt
    ＋goal condition）——batch 只改「一次規劃幾波」，不簡化任何單波的管線
