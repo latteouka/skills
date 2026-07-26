@@ -49,9 +49,9 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 
 **需人裁定例外：** 執行期遇到需人裁定的事項，按「長跑行為規範」第 5 條非阻塞升級處理——僅當其阻塞所有剩餘工作時才停下。
 
-## 外部 Skill 缺席降級
+## 相依 Skill 缺席降級
 
-本 skill 依賴的外部 skill：諮詢 `/askfable`；訪談 `/grill-me`、`/grill-with-docs`、`/brainstorming`；安全 `/insecure-defaults`、`/sharp-edges`、`/semgrep`；UX `/ui-test`、`/wcag-accessibility-audit`、`/nielsen-heuristics-audit`、`/ux-audit-rethink`。任一在環境中不存在時，與原生工具 fallback 同 pattern 降級——缺席不得靜默跳過，也不得卡死流程：
+本 skill 依賴的其他 skill：諮詢 `/askfable`；訪談 `/grill-me`、`/grill-with-docs`、`/brainstorm`（三者與 wave 同屬 kit package，正常安裝必在——本條款主要防跨 harness／未安裝環境）；安全 `/insecure-defaults`、`/sharp-edges`、`/semgrep`；UX `/ui-test`、`/wcag-accessibility-audit`、`/nielsen-heuristics-audit`、`/ux-audit-rethink`（安全與 UX 皆為 vendored 外部包）。任一在環境中不存在時，與原生工具 fallback 同 pattern 降級——缺席不得靜默跳過，也不得卡死流程：
 
 - ledger 記一行「無 {skill}，該步降級」；合約/閘門對應步驟標 `SKIPPED(不可用)`，視同「已執行並記錄」過閘（goal condition (3) 的安全/UX 判定同此認定）
 - 收尾報告以「品質 caveat」區醒目列出所有 SKIPPED 步驟——降級是誠實揭露，不是豁免
@@ -143,7 +143,7 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 > 全文並對 `inbox.md` 執行 triage（結果寫入 `backlog.md`），再回頭掃來源 1。此步驟與其餘來源掃描同屬
 > Phase 2 自動執行範圍，開波本身即代表要取料，不產生新的等待輸入節點。
 >
-> **intake kit 缺席降級（比照「外部 Skill 缺席降級」pattern，非靜默跳過）：** 未裝 intake kit 的專案
+> **intake kit 缺席降級（比照「相依 Skill 缺席降級」pattern，非靜默跳過）：** 未裝 intake kit 的專案
 > （無 `backlog.md`／`inbox.md`／`triage-rules.md`）→ 開波前自動 triage、⚠️ 硬閘門、分流三條連帶不適用
 > （沒有 backlog 就沒有 `status`／`flow` 欄位可讀）。來源 1（backlog 掃描）明確無產出——這是「未裝
 > intake kit」，不是「掃不到所以沒有待辦」；來源 3 自動退回掃舊 wave 的「📋 延後決策」（wave 原生格式，
@@ -153,7 +153,7 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 > **⚠️ 硬閘門：** `status: ⚠️需客戶確認` 的 backlog 項不得取用排波，即使使用者說「全部做完」。該項需
 > 人工改為 `ready` 或 `dropped` 才可取。
 >
-> **分流：** 取用的項依其 `flow` 欄位處理——`direct` 直接排成工作項；`spec` 需先走 `/brainstorming`
+> **分流：** 取用的項依其 `flow` 欄位處理——`direct` 直接排成工作項；`spec` 需先走 `/brainstorm`
 > （呼應下方 Phase 2.5 加碼判斷）。
 
 自動執行（不問使用者），四個來源：
@@ -191,8 +191,8 @@ git log --oneline -20
 
 需要才訪談，自己判斷。典型的「需要」：新功能或從零開始的模組、多個有效做法／架構或 UX 決策待選、與既有共識矛盾的項、模糊描述猜不準真實意圖、掃出的 ❓ 未決項。明確 bug fix 批次通常直接進 Phase 3。
 
-- 方向未定 → `/brainstorming`（先展開再收斂）；已有方案要壓力測試 → `/grill-me`；牽涉 CONTEXT.md／ADR 同步 → `/grill-with-docs`。需要 brainstorming 時先 brainstorming 再 grill
-- 碎片化統一項（Phase 2 審計已觸發）→ `/brainstorming` 直接呈現淺/中/深光譜（`references/ui-fragmentation-audit.md`），預設推薦淺層
+- 方向未定 → `/brainstorm`（先展開再收斂）；已有方案要壓力測試 → `/grill-me`；牽涉 CONTEXT.md／ADR 同步 → `/grill-with-docs`。需要 brainstorming 時先 brainstorming 再 grill
+- 碎片化統一項（Phase 2 審計已觸發）→ `/brainstorm` 直接呈現淺/中/深光譜（`references/ui-fragmentation-audit.md`），預設推薦淺層
 - 完成後帶著結論進 Phase 3，結論直接影響合約的覆蓋場景設計
 
 ### Phase 3: 分類、排序、寫驗證合約
@@ -480,7 +480,7 @@ cd .claude/worktrees/wave-{id}
 - **不默默改道**：Fable 意見與既有證據衝突時，用 SendMessage 對同一 agent 追問（「我查到 X，你建議 Y，哪個約束決勝？」），不悄悄換方向也不悄悄無視
 - **每次諮詢記 ledger 一行**：`[HH:MM] askfable 諮詢點 N：{採納/反駁+理由一句}`
 - askfable 是 Agent tool 呼叫、不是停點——執行期間照常，不違反唯一停點制
-- **缺席降級**：比照「外部 Skill 缺席降級」pattern——ledger 一行、不卡流程
+- **缺席降級**：比照「相依 Skill 缺席降級」pattern——ledger 一行、不卡流程
 
 ### 狀態外部化——Dashboard + Ledger 雙層
 
@@ -765,7 +765,7 @@ Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由�
 | `ScheduleWakeup` 心跳 fallback | 不適用——`wait_agent` 阻塞等待，無失聯風險。ledger 記一行「Codex 模式，心跳條款不適用」 |
 | `AskUserQuestion` 結構化停點 | 純文字問答（Phase 0 / Phase 4 停點照問，僅呈現格式退化，停點規則不變） |
 | `TaskCreate` / `TaskUpdate` 鏡像 | 走既有缺席條款：ledger 記一行「無 Task 工具，跳過鏡像」 |
-| `/askfable` 諮詢 | 走既有「外部 Skill 缺席降級」：ledger 記「本波無 Fable 諮詢」，收尾報告品質 caveat 列出 |
+| `/askfable` 諮詢 | 走既有「相依 Skill 缺席降級」：ledger 記「本波無 Fable 諮詢」，收尾報告品質 caveat 列出 |
 
 **Codex 執行注意：**
 
