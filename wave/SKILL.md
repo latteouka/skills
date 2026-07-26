@@ -739,7 +739,7 @@ Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由�
 
 每波在 worktree 完成後，merge 回 main：
 
-1. `git merge wave-{id}-branch` 到 main
+1. merge 本波 branch 到 main——branch 名以 ledger 開工記錄為準（手動流程＝`wave/{id}`，原生 EnterWorktree＝harness 命名如 `worktree-wave-{id}`），不憑記憶猜
 2. 加法衝突（兩波各加不同欄位到同檔案）→ 自動合併
 3. 改法矛盾（同一行改成不同東西）→ 列出衝突 + 兩波原始意圖，使用者裁定
 4. **Merge re-gate（強制，貼輸出才算合併完成）**：在 main 上依序跑 ① `bash scripts/hooks/wave-gate.sh 收尾`（存在時；不存在則 typecheck＋fast tier 測試）② 受影響 view 的 E2E 子集（本波改動檔案對應的 golden-path spec，不整套跑）——任何紅燈先修再宣告合併完成。理由：merge 殘留 TS 錯誤曾多次上 main
@@ -754,7 +754,7 @@ Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由�
 
 | Claude Code 工具 | Codex CLI 等效 |
 |---|---|
-| `EnterWorktree({ name })` | 走本文件既有的「手動 fallback 流程」（`git branch` + `git worktree add` + cd）。sandbox workspace-write 對 `.git` 寫入需 approval 升級屬預期行為，不算違規停點。**tmux 視窗名**：Claude 的 EnterWorktree 靠主程序 chdir 觸發 tmux automatic-rename，Codex 主程序 cwd 不動——建完 worktree 後補跑 `[ -n "$TMUX" ] && tmux rename-window "wave-{id}"`；合併清理 worktree 後 `[ -n "$TMUX" ] && tmux set-option -w automatic-rename on` 還原自動命名 |
+| `EnterWorktree({ name })` | `git branch` + `git worktree add` 建立 worktree 後，**必須結束當前 session、在 worktree 目錄開新 session**（`cd <worktree> && codex`）——Codex 的指令鏈與 hooks 在 session 啟動時定死，shell 內 `cd` 不會重載，同 session 繼續＝指令檔/hooks/相對路徑全部仍指向主 checkout（不是支援的 fallback，是錯誤用法）。新 session 開場驗證四項：`pwd`、`git rev-parse --show-toplevel` 含 worktrees/wave-{id}、loaded instructions（/status）、hooks 生效。sandbox 對 `.git` 寫入需 approval 屬預期。**tmux 視窗名**：從 worktree 目錄啟動 codex 時 pane_current_path 已在 worktree，automatic-rename 天然生效，免手動 rename |
 | Agent 背景派工＋完成通知 | `spawn_agent` 派子代理 + `wait_agent` 收割。Codex 子代理是**同步收割模型**：派一批 → 期間做 pipeline priming（預寫下批 brief、前置預檢）→ `wait_agent` 逐一收割。不存在「失聯」問題 |
 | `SendMessage` 續跑原 agent | `send_input` 對原子代理續話（中斷恢復、諮詢追問同此） |
 | `ScheduleWakeup` 心跳 fallback | 不適用——`wait_agent` 阻塞等待，無失聯風險。ledger 記一行「Codex 模式，心跳條款不適用」 |
