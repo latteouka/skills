@@ -30,9 +30,9 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 **合法停點：**
 
 1. **Phase 0 Align 問題**——「這波有新素材要帶入嗎？」（`/wave` 帶參數時跳過，此時全程零規劃停點；**無參數時必問，不可自答「沒有素材」代跳**）
-2. **Phase 4 範圍確認**——工作清單 + UX 審計清單 + 交集預警 + **執行方式選擇**一次問完
+2. **Phase 4 範圍確認**——工作清單 + UX 審計清單 + 交集預警一次問完（執行方式不問，自動採用——見 Phase 4「執行方式自動採用」）
 
-**停點提問形式：** 環境有 `AskUserQuestion` 工具時，兩個停點的提問用它結構化呈現——Align 用固定三選項；Phase 4 用「執行方式」單選 + 「UX 審計清單」multiSelect（工作清單本體仍以文字完整列出，選項只承載決策）。無此工具則文字問答。
+**停點提問形式：** 環境有 `AskUserQuestion` 工具時，兩個停點的提問用它結構化呈現——Align 用固定三選項；Phase 4 用「UX 審計清單」multiSelect（工作清單本體仍以文字完整列出，選項只承載決策）。無此工具則文字問答。
 
 **自動接續（不停、不問、不結束 turn）：**
 
@@ -251,7 +251,7 @@ git log --oneline -20
 
 ### Phase 4: 向使用者確認範圍
 
-輸出工作清單前先讀 `references/templates.md` 的「Phase 4 工作範圍輸出範本」節，照範本格式問使用者（驗證合約逐項列出、預估規模、Checkpoint 分段、執行方式選擇一併呈現）。
+輸出工作清單前先讀 `references/templates.md` 的「Phase 4 工作範圍輸出範本」節，照範本格式問使用者（驗證合約逐項列出、預估規模、Checkpoint 分段、執行方式自動採用結果一併呈現）。
 
 如果這波有前端工作項，在工作清單後面多輸出 UX 審計推薦——格式見 `references/templates.md` 的「UX 審計推薦範本」節。
 
@@ -286,9 +286,9 @@ git log --oneline -20
 
 **❓/需裁定項的處理（必做）：** 掃描出的每個 ❓ 未決項、以及 Phase 1 Ground 對不到的每個 ❓ 項，必須做成 Phase 4 AskUserQuestion 的**獨立問題**（選項 = 各方案／最似位置推測，推薦方案標 Recommended）——使用者就在停點上，裁定成本最低。Grounding ❓ 項裁定後立即把確認的對應 append 回 `feature-map.md` 別名欄。全域禁語適用（見 Core Principles「禁止端出縮減版」），此處另加「待裁定後可追加」。使用者裁定 → 該項排入本波；使用者明選「延後」→ 才 append 進 `.claude/dev/inbox.md`（`from: grill:{題目}`）。不得由 Claude 自行決定延後。
 
-**執行方式推薦標籤鎖定：** 推薦固定為 Subagent-Driven（模板既定）。認為 Inline 更適合本波時，必須附一句具體理由（例：項間強依賴無法並行），且不得把「（推薦）」移到 Inline 上。
+**執行方式自動採用（不問使用者）：** 固定採 Subagent-Driven（模板既定）。認為 Inline 更適合本波時，必須附一句具體理由（例：項間強依賴無法並行）並記入 dashboard Metadata——仍不問，在 Phase 4 輸出中呈現採用結果即可，使用者不滿意會自己改（2026-07-26 使用者原話：「不需要問我是要 subagent 還是 inline，直接照建議的即可」）。
 
-使用者確認工作範圍 + UX 審計清單 + 執行方式後進入 Phase 5。
+使用者確認工作範圍 + UX 審計清單後進入 Phase 5。
 
 ### Phase 5: 產出三份輸出
 
@@ -354,11 +354,11 @@ cd .claude/worktrees/wave-{id}
 
 **Step 2: 宣告後直接開工（不停）**
 
-執行方式已在 Phase 4 選定。照 `references/templates.md`「啟動宣告模板」節輸出啟動宣告（有並行波時附並行波清單），然後**直接進入 Step 3，不等待回覆**。
+執行方式已在 Phase 4 自動採用。照 `references/templates.md`「啟動宣告模板」節輸出啟動宣告（有並行波時附並行波清單），然後**直接進入 Step 3，不等待回覆**。
 
 **Step 3: 開工**
 
-兩種方式都先確認 goal condition 已寫入 wave-{id}.md「🎯 Goal Condition」區塊（使用者若下 /goal 則同步，沒下也以此區塊為準），再依 Phase 4 選定方式執行：
+兩種方式都先確認 goal condition 已寫入 wave-{id}.md「🎯 Goal Condition」區塊（使用者若下 /goal 則同步，沒下也以此區塊為準），再依 Phase 4 自動採用的方式執行：
 
 **選 1 — Subagent-Driven：**
 1. 每一批派工＝三連動作：① 備 brief（分級規則見「Brief-driven 派工」）② 派 implementer（背景、帶 model tier）③ **立即排 ScheduleWakeup fallback**（delay 分層見「心跳 fallback」；環境無此工具才可跳過，且在 ledger 記一行「無 ScheduleWakeup，跳過心跳」）
