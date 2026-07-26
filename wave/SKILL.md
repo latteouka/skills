@@ -494,7 +494,7 @@ cd .claude/worktrees/wave-{id}
 **Ledger 格式：** 見 `references/templates.md` 的「Ledger 格式」節，首次建立 ledger 檔時照格式建檔。
 
 **Ledger 使用規則：**
-- **每次派工、裁決、commit、錯誤後立即 append 一行**——不等收尾才補
+- **每次派工、裁決、commit、錯誤後立即 append 一行**——不等收尾才補；追加用 Edit 工具插在 RESUME POINTER 之前，不用 shell `>>`（會落到檔尾 ERRATA 區之後，2026-07-26 實踩 2 次）
 - **ERRATA**：controller 犯錯（誤送訊息、漏跑合約、錯判狀態）→ 記一行「教訓：…」，Subagent-Driven 的心跳 prompt 每次帶上全部條目。**回灌只在本波內、且只在心跳路徑生效**——Inline 執行、compaction 之後、下一波都讀不到它。所以「記了就算處理完」是假的：收尾必須跑 ERRATA 升級判定（收尾流程步驟 4）逐條決定去留，不得留在 ledger 等歸檔（`wave-close.sh` 會連 ledger 一起刪）
 - **暫停意圖外部化**：使用者下節流/暫停指令（「usage 快爆了先停」）→ 讓 in-flight 工作跑完、不派新工作，並把暫停意圖寫進 ledger，防止喚醒後誤判為斷線而繼續派工。使用者說「可以繼續」才清除
 
@@ -520,6 +520,7 @@ cd .claude/worktrees/wave-{id}
   6. 停止條件（遇到即停手回報：要動範圍外檔案、要刪東西、發現機密、與硬約束衝突）
 - **Brief 分級**：小項（單檔、合約短）→ 六要素完整內嵌 Agent prompt 即可；大項（schema 變更、跨系統、多檔）→ 必須落檔 `task-N-brief.md` 並另寫 `task-N-design.md`，**落檔後先派 `/askfable` 審查**（諮詢點 3），再呈使用者 review 才動手（三件套 brief/report/design 放 worktree 的 `.superpowers/sdd/` 下——gitignored scratch 不進版控）
 - Subagent 開場指令 =「先讀你的 brief，它就是你的 requirements」（內嵌時 prompt 本身即 brief）——subagent 不依賴 controller 的對話 context
+- **Brief 必含兩條執行紀律**（2026-07-26 dfaa wave 各實踩 2 次）：①長跑指令（E2E／測試／build）一律**前景執行**、Bash timeout 拉高——subagent 等自己的背景 run 永遠不會被喚醒，會卡死在等待；②同 worktree 並行派工時 commit 一律 **`git commit -- <pathspec>`** 限定路徑——共用 git index 下「A stage、B 無 pathspec commit」會把 A 的檔案掃進 B 的 commit
 - **模型分層**：派工時依項目性質選 model tier——機械、範圍明確的實作項 → `model: "sonnet"`；瑣碎查證/整理 → `haiku`；跨系統、架構性、難 debug 的項 → 省略（繼承 session 模型）。拿不準就省略。Reviewer 的 tier 不得低於該項 implementer。**每筆派工的 ledger 條目必須帶 model tier**（例：`派工 task-3 implementer（sonnet）`），tier 切換有跡可查
 - Implementer 完成**一律**交付 report：大項寫 `task-N-report.md`；小項可改為回填鏡像 Task 的 description 或在回報訊息附完整合約輸出。controller 與 reviewer 都讀
 
