@@ -1,7 +1,9 @@
 # Wave 深度材料 — E2E 跨專案通用坑
 
-本檔由 wave/SKILL.md「Playwright 使用指南」節於寫 E2E 前載入。
-（vendored 自維護者 `~/projects/E2E-PITFALLS.md` @2026-07-24，setraining 2026-04-10 CI flaky debug 實戰蒸餾；上游更新時同步）
+本檔是 B-145 的 canonical reference；wave 實際載入的 consumer 同步到
+`~/projects/dotfiles/skills/wave/references/e2e-pitfalls.md`。
+（初始內容 vendored 自維護者 `~/projects/E2E-PITFALLS.md` @2026-07-24，
+setraining 2026-04-10 CI flaky debug 實戰蒸餾；canonical 更新時同步 consumer）
 
 ## Contents
 1. Auth rate limiting vs 單一 CI runner IP（最常見）
