@@ -676,8 +676,11 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
    - **Q3 讀了會改變行為嗎？**（不是「知道就好」的常識）→ 是＝append 到 inbox 標「升級候選: CLAUDE.md」，實際落點由 `/triage` 裁定；否＝丟掉
    - 零條升級時在完成報告明寫「ERRATA N 條，全數判定為一次性，未升級」——沒寫＝沒判定
    - 未裝 intake kit 的專案：改 append 到本波 dashboard 的「未涵蓋決策」區
-5. 提示使用者「本波完成，可以 merge 回 main」
-5. **merge 後清除本波產物**（`bash <kit>/scripts/wave-close.sh {id}`）——波的 dashboard 與
+5. **直接進入合併協助，不徵詢**（[使用者裁定 2026-07-26]：「照流程本來就該直接做下去」）
+   ——舊版此處「提示使用者可以 merge」是機器防線（收尾鎖／merge re-gate／push 擋門）
+   存在之前的保守預設，防線機器化後只剩摩擦。唯一仍要停的是合併協助步驟 3 的
+   改法矛盾衝突（真需要使用者裁定改法），其餘一路做到 push 完成
+6. **merge 後清除本波產物**（`bash <kit>/scripts/wave-close.sh {id}`）——波的 dashboard 與
    ledger 在 merge 之後對未來沒有價值，內容留在 git history 即可。腳本會驗證每個檔都已提交
    且無未提交修改（任一不符即中止），把 `git show` 取回指令寫進 `wave-INDEX.md`，再 `git rm`
    dashboard＋ledger＋同 wave_id 的 spec/plan。先跑 `--dry-run` 確認範圍，刪除與 INDEX 一起 commit。
