@@ -4,7 +4,8 @@
 
 ## Phase 4 工作範圍輸出範本
 
-> **選項集合封閉。** 下方「執行方式」只有兩個選項，UX 審計只有清單勾選。**不得增列第三個選項**，
+> **選項集合封閉。** 執行方式自動採用不問（Subagent-Driven 既定；Inline 須附一句理由，見 SKILL.md
+> Phase 4「執行方式自動採用」）；UX 審計只有清單勾選。**不得增列其他選項**，
 > 尤其禁止任何形式的減量方案（「先只做 N 項」「精簡版」「範圍縮小為…」「其餘留給下一波」）。
 > 工作清單本體以文字**全列**，不分「完整版／精簡版」。縮減範圍的唯一合法路徑＝使用者自己提出。
 
@@ -34,13 +35,15 @@ C1: 🤖-1〜3 / C2: 🤖-4〜6 / ...（每 3 項一段）
 
 ### ❓ 需裁定項
 （每項一個獨立 AskUserQuestion 問題；無則寫「無」）
+
+### 🚀 執行方式（自動採用，不問）
+Subagent-Driven（既定）／ Inline＋一句具體理由（記入 dashboard Metadata）
 ```
 
 **AskUserQuestion 結構（環境有此工具時）：**
 
 | 問題 | 型別 | 選項 |
 |---|---|---|
-| 執行方式 | 單選 | Subagent-Driven（推薦）／ Inline |
 | UX 審計清單 | multiSelect | ui-test ／ wcag ／ nielsen ／ ux-audit-rethink |
 | 每個 ❓ 項 | 單選 | 各方案（推薦標 Recommended）／ 延後 |
 
@@ -152,7 +155,7 @@ Wave {id} 全部完成。完成標準：
 ✅ Wave {id} 規劃完成，直接開工。
 
 🌿 Worktree: .claude/worktrees/wave-{id} (branch: wave/{id})
-🚀 執行方式: [Phase 4 選定的方式]
+🚀 執行方式: [Phase 4 自動採用的方式]
 
 📋 Goal Condition:
 [貼出 goal condition 內容]

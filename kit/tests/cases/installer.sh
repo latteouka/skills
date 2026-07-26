@@ -28,6 +28,7 @@ assert_contains "$S" "existing.sh" "既有 hook 保留"
 assert_contains "$S" "capture.sh" "裝上 capture hook"
 assert_contains "$S" "summary.sh" "裝上 summary hook"
 assert_contains "$S" "archive.sh" "裝上 archive hook"
+assert_contains "$S" "no-midwave-questions.sh" "裝上 no-midwave-questions hook"
 assert_contains "$S" "compact" "SessionStart matcher 含 compact"
 
 # --- 備份存在

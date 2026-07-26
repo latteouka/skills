@@ -89,8 +89,11 @@ else
       | .hooks.Stop += [{
           hooks: [{ type: "command", command: ($k + "/archive.sh"), timeout: 15 }]
         }]
+      | .hooks.Stop += [{
+          hooks: [{ type: "command", command: ($k + "/no-midwave-questions.sh"), timeout: 10 }]
+        }]
     ' "$settings" > "$tmp" && mv "$tmp" "$settings"
-    created="${created} settings.json(4個hook)"
+    created="${created} settings.json(5個hook)"
 fi
 
 # --- .gitignore：kit 執行期產物（鎖檔／快照／衍生 README）不進版控。
