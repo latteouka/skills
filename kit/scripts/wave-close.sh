@@ -255,8 +255,9 @@ echo "記得把 INDEX 與刪除一起 commit。"
 # 未 triage ＝ 進不了 backlog ＝ 進不了排程視野，等於白記。
 inbox="${dev}/inbox.md"
 if [ -f "$inbox" ]; then
-    pending="$(grep -cE '^## INB-[0-9]+' "$inbox" 2>/dev/null || echo 0)"
-    donecnt="$(grep -E '^## INB-[0-9]+' "$inbox" 2>/dev/null | grep -c 'done' || echo 0)"
+    pending="$(grep -cE '^## INB-[0-9]+' "$inbox" 2>/dev/null | tr -dc '0-9' || echo 0)"
+    donecnt="$(grep -E '^## INB-[0-9]+' "$inbox" 2>/dev/null | grep -c 'done' | tr -dc '0-9' || echo 0)"
+    : "${pending:=0}" "${donecnt:=0}"
     pending=$((pending - donecnt))
     limit="$(kit_config_get inbox_alert 8 2>/dev/null)"
     case "$limit" in ''|*[!0-9]*) limit=8 ;; esac
