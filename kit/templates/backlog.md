@@ -19,6 +19,7 @@
 
 - **from**: INB-042（口述 2026-07-25）／INB-051（逐字稿:0724會議）
 - **matrix**: 101-案件與證物管理.yaml #12
+- **touches**: `<repo-root-relative exact path/glob>`；未知時改填 `unknown:<具體原因>`
 - **evidence**: <為何判定此 type 的依據>
 - **repro**: <重現步驟；BUG 才需要>
 - **wave**: —
@@ -48,6 +49,12 @@
 | `P2` | 客戶會碰到 |
 | `P3` | 體驗 |
 | `P4` | 有空再說 |
+
+### `touches` 欄（`ready` 必填）
+
+填預計寫入的 repo-root-relative exact path 或窄 glob；多個值用 `；` 分隔。
+規劃尚未收斂時填 `unknown:<具體原因>`，不得猜測。`/wave batch` 會對比候選項：
+確定交集不得排進同一波或並行波；unknown 視為交集未明，收斂前不得並行。
 
 ### `proof` 欄（`done` 必填）
 

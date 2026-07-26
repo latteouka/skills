@@ -19,6 +19,10 @@ assert_eq "1" "$([ -f "$SANDBOX/.claude/dev/inbox.md" ] && echo 1 || echo 0)" "�
 assert_eq "1" "$([ -f "$SANDBOX/.claude/dev/backlog.md" ] && echo 1 || echo 0)" "建立 backlog.md"
 assert_eq "1" "$([ -f "$SANDBOX/.claude/dev/intake.config.yaml" ] && echo 1 || echo 0)" "建立 config"
 
+BACKLOG_CONTENT="$(cat "$SANDBOX/.claude/dev/backlog.md")"
+assert_contains "$BACKLOG_CONTENT" '- **touches**:' "backlog 模板含 touches 欄"
+assert_contains "$BACKLOG_CONTENT" 'unknown:' "backlog 模板示範未知 touches 標記"
+
 S="$(cat "$SANDBOX/.claude/settings.json")"
 assert_contains "$S" "existing.sh" "既有 hook 保留"
 assert_contains "$S" "capture.sh" "裝上 capture hook"

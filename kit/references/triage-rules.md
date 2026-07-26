@@ -20,13 +20,14 @@
 
 **判斷不完整就不要硬填**——填錯的 `flow` 會讓大改動溜進 `direct` 而略過設計階段，比多繞一趟 inbox 貴得多。
 
-## 0.5 三個從實務長出來的欄位（2026-07-25 吸收自既有波產出慣例）
+## 0.5 四個從實務長出來的欄位（2026-07-25 起吸收自既有波產出慣例）
 
 | 欄位／值 | 用途 |
 |---|---|
 | `proof`（`done` 必填） | 「已完成」必須可查證：commit hash／實測輸出／counter 變化／閘門結果。**填不出來就不能標 done** |
 | `🔶止血:{wave-id}` | 症狀已緩解、根因仍在。**不可視同完成**——它會在別處以別的樣貌再出現 |
 | `pri: P0` | **本波製造的回歸**。自己造的債優先於一切既有待辦，因為那是淨新增的傷害 |
+| `touches`（`ready` 必填） | 預計寫入的 repo-root-relative exact path 或 glob，供 `/wave batch` 在開波前做交集預警 |
 
 ## 1. 定位規格條目
 
@@ -76,6 +77,30 @@ grep -rn "<關鍵詞>" <spec_layer>
 例：一個 SPEC_CHANGE 若只改一個預設值，是 `type: SPEC_CHANGE`＋`status: ⚠️需客戶確認`＋`flow: direct` ——客戶確認過後直接進 wave 做掉，不需要寫 spec。一個 BUG 若要動 5 個檔並改資料模型，是 `type: BUG`＋`flow: spec`。
 
 `flow: direct` 的工作項**不需要**先走 brainstorming。這不是在合理化跳過流程——分流判定已在 triage 階段完成，重複 brainstorming 只會產生無人閱讀的 spec 並加劇文件堆積。
+
+### 4.1 `touches` 填寫與交集預警
+
+每筆 `status: ready` 的明細都必須有一行 `- **touches**:`。值是預計會寫入的檔案，
+不是只讀的參考資料：
+
+- 已知單一檔案時填 repo root 起算的 exact path，例如
+  `apps/web/src/server/api/routers/case.ts`。
+- 同一窄目錄內有多個尚未定名的檔案時可填 glob，例如
+  `apps/web/src/components/case-work-wizard/**`；不得只填 `src/**`、`docs/**`
+  這類失去排程價值的寬泛範圍。
+- 有多個範圍時用全形分號 `；` 分隔，每個 path/glob 都各自用反引號包住。
+- 規劃尚未收斂、無法安全判斷時填 `unknown:<具體原因>`，例如
+  `unknown:尚待 spec 決定資料模型`。不得猜路徑，也不得只寫裸 `unknown`。
+
+`/wave batch` 排出候選工作後，必須在產生 wave prompt 前逐對比 `touches`：
+
+1. exact path 相同，或任一 exact path 被另一方 glob 涵蓋，視為確定交集。
+2. 兩個 glob 有共同可匹配路徑時也視為確定交集；列出工作項 id 與相交 pattern，
+   發出「交集預警」，不得排進同一波或並行波。
+3. 任一方含 `unknown:<具體原因>`，視為與所有項目交集未明；發出未決預警，
+   先在規劃階段把它收斂成 path/glob，未收斂前不得並行。
+4. 比對只決定排程衝突，不取代開工後以 `wave-registry.sh intersect` 對實際 diff
+   的二次檢查。
 
 ## 4.5 ERRATA 升級判定（`from: errata:*` 專用）
 
