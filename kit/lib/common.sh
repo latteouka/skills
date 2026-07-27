@@ -114,8 +114,13 @@ kit_fm_get() {
 # （如「這跟 INB-042 是同一個問題」、backlog.md 的「from: INB-042」）不是
 # 條目，不該被算進最大值，否則會把下一號劫持掉（2026-07-25 修正：舊版
 # grep -o 全檔掃描，行內任何 INB-NNN 字面值都會誤判成條目）。
+#
+# high-water mark：triage 把條目清空後，檔內最大值歸零，新條目會與 git
+# history 的舊編號撞號（2026-07-28 dfaa 實見：inbox 清空後回到 INB-001）。
+# 解法＝檔內留一行 `<!-- <prefix>-seq: NNN -->`（triage 清條目時必須寫入／
+# 更新），取 max(標題行, seq 註記)。無註記的檔行為不變。
 kit_next_id() {
-    local file="$1" prefix="$2" max
+    local file="$1" prefix="$2" max seq
     max=0
     if [ -f "$file" ]; then
         max="$(grep -o "^## ${prefix}-[0-9][0-9]*" "$file" 2>/dev/null \
@@ -123,6 +128,12 @@ kit_next_id() {
             | sort -n \
             | tail -1)"
         [ -n "$max" ] || max=0
+        seq="$(grep -o "<!-- ${prefix}-seq: [0-9][0-9]* -->" "$file" 2>/dev/null \
+            | sed "s/<!-- ${prefix}-seq: //; s/ -->//" \
+            | sort -n \
+            | tail -1)"
+        [ -n "$seq" ] || seq=0
+        if [ "$((10#$seq))" -gt "$((10#$max))" ]; then max="$seq"; fi
     fi
     printf '%s-%03d' "$prefix" "$((10#$max + 1))"
 }

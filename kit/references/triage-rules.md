@@ -139,5 +139,8 @@ Subagent-Driven 的心跳 prompt——Inline 執行、compaction 後、下一波
 ## 6. 收尾
 
 - 已處理的 `INB-NNN` 從 `inbox.md` 移除（其內容已轉入 backlog 的 `from` 欄）
+- **移除條目後必須更新檔內 high-water mark**：`<!-- INB-seq: NNN -->`（NNN＝本批最大編號）
+  ——`kit_next_id` 靠它在條目清空後仍接續編號，漏寫＝下一筆從 001 起與 git history 撞號
+  （2026-07-28 dfaa 實見）。註記放檔頭歷史指標區，每批 triage 更新為新最大值
 - 輸出處理摘要：新增 N 筆、併入 M 筆、dropped K 筆、⚠️ 待確認 J 筆
 - **若 config 已設 `spec_check` 且本批有任何 `type: SPEC_CHANGE` 或 `NEW` 的項目**（會動到規格層），輸出提醒使用者執行該指令驗證規格檔一致性。若 `spec_check` 為空則跳過此提醒。
