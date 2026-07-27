@@ -86,11 +86,28 @@ if [ -n "$raw" ]; then
     fi
     trap 'kit_lock_release "$lockdir"' EXIT
 
+    # ---- ops memo 分流標記（config 未設＝完全跳過，跨專案安全降級）----
+    # 專案設 ops_memo（路徑）＋ops_keywords（| 分隔字串清單）時，命中詞的條目
+    # 仍照寫 inbox（保底不丟），但附 flag ＋在提示裡指示 Claude 立即搬移——
+    # 自動改寫結構化 memo 誤判成本高，保底寫入＋LLM 搬移是刻意取捨。
+    ops_memo="$(kit_config_get ops_memo '')"
+    ops_keywords="$(kit_config_get ops_keywords '')"
+    ops_hit=""
+    if [ -n "$ops_memo" ] && [ -n "$ops_keywords" ]; then
+        _old_ifs="$IFS"; IFS='|'
+        for kw in $ops_keywords; do
+            [ -n "$kw" ] || continue
+            case "$raw" in *"$kw"*) ops_hit="$kw"; break ;; esac
+        done
+        IFS="$_old_ifs"
+    fi
+
     id="$(kit_next_id "$inbox" INB)"
     {
         printf '\n## %s\n' "$id"
         printf -- '- when: %s\n' "$(date '+%Y-%m-%d %H:%M')"
         printf -- '- from: 口述\n'
+        [ -n "$ops_hit" ] && printf -- '- flag: ops-memo?（命中詞：%s）\n' "$ops_hit"
         printf -- '- raw: %s\n' "$raw"
     } >> "$inbox"
 
@@ -98,7 +115,11 @@ if [ -n "$raw" ]; then
     if grep -q "^## ${id}$" "$inbox"; then
         kit_lock_release "$lockdir"
         trap - EXIT
-        emit_context "已自動收錄至收件匣：${id}。回覆時簡短告知使用者即可，不需重複內容。"
+        if [ -n "$ops_hit" ]; then
+            emit_context "已收錄至收件匣：${id}，但命中部署／現場關鍵詞「${ops_hit}」——依專案規則此類事項的 SSOT 是 ${ops_memo}。請立即判斷：確屬部署／現場／環境狀態類 → 把內容寫進 ${ops_memo} 對應節並將 inbox 該條改為指標註記；屬開發項 → 留在 inbox 照常 triage。"
+        else
+            emit_context "已自動收錄至收件匣：${id}。回覆時簡短告知使用者即可，不需重複內容。"
+        fi
         exit 0
     else
         kit_lock_release "$lockdir"
@@ -122,5 +143,10 @@ done < "$patterns"
 
 [ -n "$hit" ] || exit 0
 
-emit_context "本則訊息疑似回饋（命中詞：${hit}）。若確為使用者回報的 bug／需求／改善建議，先 append 至 .claude/dev/inbox.md（欄位 when/from/raw，編號接續最大值）再回答；若只是除錯討論或技術問答則忽略此提示。"
+# 弱信號也帶 ops 分流提示（config 未設時字串為空、訊息維持原樣）
+ops_memo_weak="$(kit_config_get ops_memo '')"
+ops_note=""
+[ -n "$ops_memo_weak" ] && ops_note="部署／現場／環境狀態類事項則改寫 ${ops_memo_weak}（該類 SSOT，不入 inbox）；"
+
+emit_context "本則訊息疑似回饋（命中詞：${hit}）。若確為使用者回報的 bug／需求／改善建議，先 append 至 .claude/dev/inbox.md（欄位 when/from/raw，編號接續最大值）再回答；${ops_note}若只是除錯討論或技術問答則忽略此提示。"
 exit 0
