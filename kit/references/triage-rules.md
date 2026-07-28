@@ -2,6 +2,20 @@
 
 對 `inbox.md` 中每一筆 `## INB-NNN` 執行下列步驟，結果寫入 `backlog.md`。
 
+## -1. 先合併分片（inbox.d/ 存在時必做第一步）
+
+多 session 並行時 capture.sh 把強信號寫進 `inbox.d/<sid8>.md` 分片（條目 id 為
+臨時的 `CAP-HHMMSS`，不佔 INB 號）。triage 開始前：
+
+1. 讀出全部 `inbox.d/*.md` 的 `## CAP-*` 條目，**依 when 排序**依次轉正——
+   每筆給正式 `INB-NNN`（接續 high-water mark）append 進 `inbox.md`，
+   `from` 欄補 `（自分片 <sid8>）`
+2. 轉正完成後**刪除已消化的分片檔**（內容已在 inbox.md，留著會重複計數）
+3. 更新 `<!-- INB-seq: NNN -->` 為新最大值
+4. 再開始對 inbox.md 跑步驟 0 起的判斷樹
+
+分片不存在或為空 → 跳過本步。
+
 ## 0. 兩個入口——分界是「判斷完成了沒」，不是「誰寫的」
 
 **能填得出 `type` / `flow` / `matrix` 三個欄位 → 直接寫 `backlog.md`，跳過 inbox。**

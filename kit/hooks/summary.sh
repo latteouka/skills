@@ -30,12 +30,22 @@ case "$stale_days"  in ''|*[!0-9]*) stale_days=60 ;; esac
 parts=""
 add_part() { if [ -n "$parts" ]; then parts="${parts}；$1"; else parts="$1"; fi }
 
-# 未整理筆數
+# 未整理筆數（inbox.md 的 INB- 條目 ＋ inbox.d/ 分片的 CAP- 條目）
 if [ -f "${dev}/inbox.md" ]; then
     n="$(grep -c '^## INB-' "${dev}/inbox.md" 2>/dev/null || echo 0)"
     case "$n" in ''|*[!0-9]*) n=0 ;; esac
-    if [ "$n" -ge "$inbox_alert" ]; then
-        add_part "收件匣 ${n} 筆未整理（開波時會自動 triage，或手動 /triage）"
+    shard_n=0
+    if [ -d "${dev}/inbox.d" ]; then
+        shard_n="$(cat "${dev}/inbox.d"/*.md 2>/dev/null | grep -c '^## CAP-' || echo 0)"
+        case "$shard_n" in ''|*[!0-9]*) shard_n=0 ;; esac
+    fi
+    total=$((n + shard_n))
+    if [ "$total" -ge "$inbox_alert" ]; then
+        if [ "$shard_n" -gt 0 ]; then
+            add_part "收件匣 ${total} 筆未整理（含分片 ${shard_n} 筆；開波時會自動 triage，或手動 /triage）"
+        else
+            add_part "收件匣 ${total} 筆未整理（開波時會自動 triage，或手動 /triage）"
+        fi
     fi
 fi
 

@@ -27,6 +27,18 @@ root="$(kit_main_repo_root)" || exit 0
 inbox="${root}/.claude/dev/inbox.md"
 [ -f "$inbox" ] || exit 0
 
+# shard 化（B-176／INB-070(c)）：多 session 並行重寫 inbox.md 互蓋已兩度實證。
+# 有 session_id 時強信號寫 inbox.d/<sid8>.md 分片（每 session 一檔、天然無互蓋），
+# /triage 時合併回 inbox.md 統一給 INB 編號。分片內用 CAP-<HHMMSS> 臨時 id，
+# 不佔 INB 號（編號權集中在 triage 單一時點，避免分片間撞號）。
+# 無 session_id（舊 harness）→ fallback 直寫 inbox.md（原行為）。
+session_id="$(printf '%s' "$payload" | jq -r '.session_id // empty' 2>/dev/null)" || session_id=""
+shard=""
+if [ -n "$session_id" ]; then
+    sid8="$(printf '%s' "$session_id" | tr -cd 'A-Za-z0-9' | cut -c1-8)"
+    [ -n "$sid8" ] && shard="${root}/.claude/dev/inbox.d/${sid8}.md"
+fi
+
 # 以 jq 產生 JSON，確保引號／換行正確跳脫
 emit_context() {
     printf '%s' "$1" | jq -R -s '{
@@ -79,16 +91,9 @@ if [ -n "$raw" ]; then
 
     [ -n "$raw" ] || exit 0
 
-    lockdir="${root}/.claude/dev/.inbox.lock"
-    if ! kit_lock_acquire "$lockdir" 20; then
-        emit_context "收件匣忙碌中，本則未自動收錄。如為回饋請手動 append inbox.md。"
-        exit 0
-    fi
-    trap 'kit_lock_release "$lockdir"' EXIT
-
     # ---- ops memo 分流標記（config 未設＝完全跳過，跨專案安全降級）----
     # 專案設 ops_memo（路徑）＋ops_keywords（| 分隔字串清單）時，命中詞的條目
-    # 仍照寫 inbox（保底不丟），但附 flag ＋在提示裡指示 Claude 立即搬移——
+    # 仍照寫（保底不丟），但附 flag ＋在提示裡指示 Claude 立即搬移——
     # 自動改寫結構化 memo 誤判成本高，保底寫入＋LLM 搬移是刻意取捨。
     ops_memo="$(kit_config_get ops_memo '')"
     ops_keywords="$(kit_config_get ops_keywords '')"
@@ -101,6 +106,35 @@ if [ -n "$raw" ]; then
         done
         IFS="$_old_ifs"
     fi
+
+    if [ -n "$shard" ]; then
+        # shard 路徑：每 session 一檔、無互蓋 → 不需 lock；臨時 id 不佔 INB 號
+        mkdir -p "${root}/.claude/dev/inbox.d" 2>/dev/null || true
+        id="CAP-$(date '+%H%M%S')"
+        {
+            printf '\n## %s\n' "$id"
+            printf -- '- when: %s\n' "$(date '+%Y-%m-%d %H:%M')"
+            printf -- '- from: 口述\n'
+            [ -n "$ops_hit" ] && printf -- '- flag: ops-memo?（命中詞：%s）\n' "$ops_hit"
+            printf -- '- raw: %s\n' "$raw"
+        } >> "$shard" 2>/dev/null
+        if grep -q "^## ${id}$" "$shard" 2>/dev/null; then
+            if [ -n "$ops_hit" ]; then
+                emit_context "已收錄至收件匣分片（${id}），但命中部署／現場關鍵詞「${ops_hit}」——依專案規則此類事項的 SSOT 是 ${ops_memo}。請立即判斷：確屬部署／現場／環境狀態類 → 寫進 ${ops_memo} 對應節並把分片該條改為指標註記；屬開發項 → 留分片等 triage 合併。"
+            else
+                emit_context "已收錄至收件匣分片：${id}（inbox.d/，triage 時合併編號）。回覆時簡短告知使用者即可。"
+            fi
+            exit 0
+        fi
+        # 分片寫入失敗 → fall through 走主 inbox 保底
+    fi
+
+    lockdir="${root}/.claude/dev/.inbox.lock"
+    if ! kit_lock_acquire "$lockdir" 20; then
+        emit_context "收件匣忙碌中，本則未自動收錄。如為回饋請手動 append inbox.md。"
+        exit 0
+    fi
+    trap 'kit_lock_release "$lockdir"' EXIT
 
     id="$(kit_next_id "$inbox" INB)"
     {

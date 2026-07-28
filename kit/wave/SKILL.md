@@ -169,6 +169,8 @@ grep -rn "TODO\|FIXME" src/ lib/ app/ 2>/dev/null | head -50
 # （-f 先判斷檔案存在，grep -c 才不會遇到「檔案不存在→空字串+exit 2」被誤讀成 0 的邊界）
 if [ -f .claude/dev/inbox.md ]; then
   grep -c '^## INB-' .claude/dev/inbox.md
+  # 分片（多 session 並行的 capture 產出，triage 時合併——見 triage-rules §-1）
+  cat .claude/dev/inbox.d/*.md 2>/dev/null | grep -c '^## CAP-'
 else
   grep -A 20 "📋 延後決策" .claude/dev/wave-*.md 2>/dev/null
 fi
@@ -511,16 +513,21 @@ cd .claude/worktrees/wave-{id}
 主 session 作為 controller，額外遵循：
 
 **Brief-driven 派工：**
-- 每個 implementer 的 brief 含六要素：
+- 每個 implementer 的 brief 以**第 0 項（執行紀律）開頭**，再接六要素。第 0 項必須是 brief 的**第一段**、逐字含「**違反任一條＝任務失敗**」宣告——實證（2026-07-28 matrix-hardening）：同樣條文寫在 brief 中段被跳過（累計 ≥3 次），提為開頭＋失敗宣告後四個 agent 零違規。controller 組 brief 時直接複製下面這段放最前面：
+
+  > **【第 0 項・執行紀律——違反任一條＝任務失敗】**
+  > ①長跑指令（E2E／測試／build）一律**前景執行**、Bash timeout 拉高（600000ms 級）——你等自己的背景 run 永遠不會被喚醒；
+  > ②同 worktree 並行工作時 commit 一律 **`git commit -- <pathspec>`** 限定路徑——共用 git index 下無 pathspec commit 會把別人 staged 的檔案掃進你的 commit。
+
+- 六要素：
   1. 需求描述 + 裁定結論
   2. 程式現況（`file:line` 引用，註明「行號可能漂移，以語意定位」）
   3. 驗證合約（從 dashboard 複製該項完整合約）
   4. 硬約束（不可碰的檔案/目錄，如其他波涉及範圍）
   5. 非目標（明確不做的事，至少一條——防順手改、防 scope 蔓延）
   6. 停止條件（遇到即停手回報：要動範圍外檔案、要刪東西、發現機密、與硬約束衝突）
-- **Brief 分級**：小項（單檔、合約短）→ 六要素完整內嵌 Agent prompt 即可；大項（schema 變更、跨系統、多檔）→ 必須落檔 `task-N-brief.md` 並另寫 `task-N-design.md`，**落檔後先派 `/askfable` 審查**（諮詢點 3），再呈使用者 review 才動手（三件套 brief/report/design 放 worktree 的 `.superpowers/sdd/` 下——gitignored scratch 不進版控）
+- **Brief 分級**：小項（單檔、合約短）→ 第 0 項＋六要素完整內嵌 Agent prompt 即可；大項（schema 變更、跨系統、多檔）→ 必須落檔 `task-N-brief.md` 並另寫 `task-N-design.md`，**落檔後先派 `/askfable` 審查**（諮詢點 3），再呈使用者 review 才動手（三件套 brief/report/design 放 worktree 的 `.superpowers/sdd/` 下——gitignored scratch 不進版控）
 - Subagent 開場指令 =「先讀你的 brief，它就是你的 requirements」（內嵌時 prompt 本身即 brief）——subagent 不依賴 controller 的對話 context
-- **Brief 必含兩條執行紀律**：①長跑指令（E2E／測試／build）一律**前景執行**、Bash timeout 拉高——subagent 等自己的背景 run 永遠不會被喚醒；②同 worktree 並行派工時 commit 一律 **`git commit -- <pathspec>`** 限定路徑——共用 git index 下無 pathspec commit 會把別人 staged 的檔案掃進自己的 commit
 - **模型分層**：派工時依項目性質選 model tier——機械、範圍明確的實作項 → `model: "sonnet"`；瑣碎查證/整理 → `haiku`；跨系統、架構性、難 debug 的項 → 省略（繼承 session 模型）。拿不準就省略。Reviewer 的 tier 不得低於該項 implementer。**每筆派工的 ledger 條目必須帶 model tier**（例：`派工 task-3 implementer（sonnet）`），tier 切換有跡可查
 - Implementer 完成**一律**交付 report：大項寫 `task-N-report.md`；小項可改為回填鏡像 Task 的 description 或在回報訊息附完整合約輸出。controller 與 reviewer 都讀
 

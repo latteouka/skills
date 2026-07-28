@@ -138,6 +138,7 @@ git -C "$root" merge-tree --write-tree "$base" "$base" >/dev/null 2>&1 || merge_
 is_append_only() {
     case "$(basename "$1")" in
         wave-INDEX.md|*-ledger.md|inbox.md) return 0 ;;
+        */inbox.d/*.md) return 0 ;;
         *) return 1 ;;
     esac
 }
