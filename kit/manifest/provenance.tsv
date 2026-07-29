@@ -1,0 +1,13 @@
+# kit provenance manifest — closed ledger（格式規格見 references/declaration-formats.md「manifest」節）
+# kit_path	upstream	upstream_commit	upstream_sha256	kit_sha256	absorbed	mode	notes
+hooks/archive.sh	kit:original	-	-	sha256:2f9af31d958dad2594c19988eba33e6506ffd6e5bc529778e2d0a431e9251dd7	2026-07-30	verbatim	-
+hooks/capture.sh	kit:original	-	-	sha256:40258bdc763f64d59fd85fe82803ddbd668a8cce56e4a6fa177a22e50450afa4	2026-07-30	verbatim	-
+hooks/no-midwave-questions.sh	kit:original	-	-	sha256:738f85e2a4b5d71e13c824bc1adb601ca8e2c1af8cd719c4eb086f69da3bbe61	2026-07-30	verbatim	-
+hooks/skills-hint.sh	kit:original	-	-	sha256:43768336867bcf6156c9de67053e69a32afa782c0fd92927d3fd5e38cc5efd5f	2026-07-30	verbatim	-
+hooks/summary.sh	kit:original	-	-	sha256:c46c690cc4523f766505166a3991c83c135ab9bc4d3b95b5304950a7e2810321	2026-07-30	verbatim	-
+hooks/wave-awareness.sh	kit:original	-	-	sha256:0c555b41b515d44f0d287f8c6d90010ed1bd5c09801ff2357568177c1f454ff3	2026-07-30	verbatim	-
+scripts/gen-readme.sh	kit:original	-	-	sha256:75d383836e7d90ecc68e1d69a3e99a0d73bc0ce3442f7d993fe8409c82a2a6a3	2026-07-30	verbatim	-
+scripts/wave-close.sh	kit:original	-	-	sha256:d15a2fb09accb4c2222ddf72b2740e1fb5f49838ef9b2f3d5e55e00ed5554df7	2026-07-30	verbatim	-
+scripts/wave-registry.sh	kit:original	-	-	sha256:8270f043816b30a3b875f005c50a7025665d45ee055946bb42c4ca47fd7c51da	2026-07-30	verbatim	-
+lib/common.sh	kit:original	-	-	sha256:ee24d31045e1ccae1883447c6b2d857ac62f59ee70ae16f3a00e56f31520f52b	2026-07-30	verbatim	-
+installers/intake.sh	kit:original	-	-	sha256:ab9e59400b000fdd840426c8d0a1e75d92d7e5d4bc97d290523f1c782e53933b	2026-07-30	verbatim	-
