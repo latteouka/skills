@@ -147,4 +147,68 @@ rm -rf "$NOTGIT_SANDBOX"
 
 rm -rf "$MAINROOT_SANDBOX"
 
+# --- [K1] kit_decl_get：flat-key 宣告檔讀取（檔案路徑參數化版 kit_config_get）
+DECL_SANDBOX="$(mktemp -d)"
+cat > "$DECL_SANDBOX/kit.yaml" <<'EOF'
+kit_root: "/Users/x/projects/skills/kit"
+modules: "intake backlog rtm"   # 已安裝模組
+baseline_file: quality-baseline.json
+empty_field: ""
+EOF
+assert_eq "/Users/x/projects/skills/kit" "$(kit_decl_get "$DECL_SANDBOX/kit.yaml" kit_root '')" "decl 引號值去引號"
+assert_eq "intake backlog rtm" "$(kit_decl_get "$DECL_SANDBOX/kit.yaml" modules '')" "decl 引號值含空格＋行內註解不截斷"
+assert_eq "quality-baseline.json" "$(kit_decl_get "$DECL_SANDBOX/kit.yaml" baseline_file '')" "decl 裸值"
+assert_eq "DEF" "$(kit_decl_get "$DECL_SANDBOX/kit.yaml" not_there 'DEF')" "decl 缺 key 回 default"
+assert_eq "DEF" "$(kit_decl_get "$DECL_SANDBOX/kit.yaml" empty_field 'DEF')" "decl 空引號值回 default（欄位留空＝降級）"
+assert_eq "DEF" "$(kit_decl_get "$DECL_SANDBOX/no-such-file.yaml" kit_root 'DEF')" "decl 缺檔 fail-open 回 default"
+
+# --- [K1] kit_manifest_lookup：8 欄 TSV 欄 1 exact match
+printf '# comment line\nengines/ratchet.sh\tdfaa:scripts/hooks/ratchet.sh\tc1260c839\tsha256:aa\tsha256:bb\t2026-07-30\tparameterized\tnote here\nlib/common.sh\tkit:original\t-\t-\tsha256:cc\t2026-07-30\tverbatim\t-\n' > "$DECL_SANDBOX/prov.tsv"
+LOOKUP_HIT="$(kit_manifest_lookup "$DECL_SANDBOX/prov.tsv" "lib/common.sh")"
+assert_eq "lib/common.sh" "$(printf '%s' "$LOOKUP_HIT" | cut -f1)" "manifest 命中取整行（驗欄1）"
+assert_eq "kit:original" "$(printf '%s' "$LOOKUP_HIT" | cut -f2)" "manifest 命中取整行（驗欄2）"
+assert_eq "" "$(kit_manifest_lookup "$DECL_SANDBOX/prov.tsv" "no/such/path.sh")" "manifest 未命中回空"
+assert_eq "" "$(kit_manifest_lookup "$DECL_SANDBOX/absent.tsv" "lib/common.sh")" "manifest 缺檔 fail-open 回空"
+# 欄 1 前綴相同的不可誤中（exact match，非 prefix match）
+printf 'a/b.sh\tkit:original\t-\t-\tsha256:dd\t2026-07-30\tverbatim\t-\na/b.sh.bak\tkit:original\t-\t-\tsha256:ee\t2026-07-30\tverbatim\t-\n' > "$DECL_SANDBOX/prov2.tsv"
+assert_eq "sha256:ee" "$(kit_manifest_lookup "$DECL_SANDBOX/prov2.tsv" "a/b.sh.bak" | cut -f5)" "manifest exact match 不受前綴相似行干擾"
+
+# --- [K1] kit_marker_block：首插 → append 到檔尾
+MB_FILE="$DECL_SANDBOX/pre-commit"
+printf '#!/bin/sh\necho project-own-line\n' > "$MB_FILE"
+kit_marker_block "$MB_FILE" "backlog" "bash /kit/gates/backlog-lint.sh"
+assert_eq "1" "$(grep -c '^# >>> kit:backlog >>>$' "$MB_FILE")" "marker 首插：start 標記存在"
+assert_eq "1" "$(grep -c 'backlog-lint.sh' "$MB_FILE")" "marker 首插：內容存在"
+assert_eq "1" "$(grep -c 'project-own-line' "$MB_FILE")" "marker 首插：專案原有內容保留"
+
+# --- [K1] kit_marker_block：更新冪等——同內容跑兩次，檔案不變
+SNAP1="$(cat "$MB_FILE")"
+kit_marker_block "$MB_FILE" "backlog" "bash /kit/gates/backlog-lint.sh"
+assert_eq "$SNAP1" "$(cat "$MB_FILE")" "marker 同內容重跑冪等（檔案逐位元組相同）"
+
+# --- [K1] kit_marker_block：更新換內容——區塊只有一份、內容是新的
+kit_marker_block "$MB_FILE" "backlog" "bash /kit/gates/backlog-lint.sh --strict"
+assert_eq "1" "$(grep -c '^# >>> kit:backlog >>>$' "$MB_FILE")" "marker 更新：區塊不重複"
+assert_eq "1" "$(grep -c 'backlog-lint.sh --strict' "$MB_FILE")" "marker 更新：新內容生效"
+assert_eq "0" "$(grep -c 'backlog-lint.sh$' "$MB_FILE")" "marker 更新：舊內容已被替換"
+
+# --- [K1] kit_marker_block：雙模組共存互不 clobber
+kit_marker_block "$MB_FILE" "rtm" "bash /kit/gates/require-requirements-sync.sh"
+assert_eq "1" "$(grep -c '^# >>> kit:backlog >>>$' "$MB_FILE")" "雙模組：backlog 區塊仍在"
+assert_eq "1" "$(grep -c '^# >>> kit:rtm >>>$' "$MB_FILE")" "雙模組：rtm 區塊新增"
+kit_marker_block "$MB_FILE" "rtm" "updated-rtm-content"
+assert_eq "1" "$(grep -c 'backlog-lint.sh --strict' "$MB_FILE")" "雙模組：更新 rtm 不動 backlog 內容"
+assert_eq "1" "$(grep -c 'updated-rtm-content' "$MB_FILE")" "雙模組：rtm 更新生效"
+
+# --- [K1] kit_marker_block：content 含 sed 替換特殊字元（/ & \）不變形
+kit_marker_block "$MB_FILE" "special" 'path=/a/b && echo "x\\y" & wait'
+assert_eq "1" "$(grep -cF 'path=/a/b && echo "x\\y" & wait' "$MB_FILE")" "特殊字元 / & 反斜線逐位元組原樣"
+
+# --- [K1] kit_marker_block：多行 content
+kit_marker_block "$MB_FILE" "multi" "$(printf 'line-one\nline-two')"
+assert_eq "1" "$(grep -c '^line-one$' "$MB_FILE")" "多行 content：第一行"
+assert_eq "1" "$(grep -c '^line-two$' "$MB_FILE")" "多行 content：第二行"
+
+rm -rf "$DECL_SANDBOX"
+
 rm -rf "$SANDBOX"

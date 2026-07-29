@@ -107,6 +107,56 @@ kit_fm_get() {
     _kit_unquote_value "$raw"
 }
 
+# kit_decl_get <file> <key> [default]
+# 讀任意 flat-key YAML 宣告檔（如專案 .claude/kit/kit.yaml）的 top-level key。
+# 與 kit_config_get 同一套解析（行內註解、引號值），差別只在檔案路徑參數化——
+# kit_config_get 綁 intake.config.yaml（intake 模組私有），本函式供跨模組宣告檔用。
+# fail-open：缺檔／缺 key／空值一律回 default。
+kit_decl_get() {
+    local file="$1" key="$2" default="${3:-}" raw val
+    [ -f "$file" ] || { printf '%s' "$default"; return 0; }
+    raw="$(sed -n "s/^${key}:[[:space:]]*//p" "$file" | sed -n '1p')"
+    val="$(_kit_unquote_value "$raw")"
+    [ -n "$val" ] || val="$default"
+    printf '%s' "$val"
+}
+
+# kit_manifest_lookup <manifest> <kit_path>
+# 從 provenance manifest（8 欄 TSV）取 kit_path 完全相符的那一行（欄 1 exact match）。
+# 註解行（#開頭）與空行不參與比對。未命中回空字串（fail-open），命中印整行。
+# manifest 路徑參數化：正常呼叫傳 manifest/provenance.tsv，測試傳 scratch fixture。
+kit_manifest_lookup() {
+    local manifest="$1" kit_path="$2"
+    [ -f "$manifest" ] || return 0
+    awk -F'\t' -v p="$kit_path" '!/^#/ && NF > 0 && $1 == p { print; exit }' "$manifest"
+}
+
+# kit_marker_block <file> <module> <content>
+# 冪等 marker 區塊插入/更新——供 installer 對 .husky/* 等專案自有檔案插入 kit
+# 管理段落，不覆寫專案自己的內容。標記格式：
+#   # >>> kit:<module> >>>
+#   <content>
+#   # <<< kit:<module> <<<
+# 行為：檔內已有該 module 標記 → 原地更新區塊內容；沒有 → append 到檔尾。
+# 跑兩次結果相同（冪等）；不同 module 的區塊共存互不影響。
+# 用 awk 而非 sed：content 經 ENVIRON 傳遞逐位元組原樣輸出，含 / & 反斜線等
+# sed 替換特殊字元皆不變形。檔案不存在時建檔（fail-open：建不了就放棄不報錯）。
+kit_marker_block() {
+    local file="$1" module="$2" content="$3" start end tmp
+    start="# >>> kit:${module} >>>"
+    end="# <<< kit:${module} <<<"
+    [ -f "$file" ] || { touch "$file" 2>/dev/null || return 0; }
+    tmp="${file}.kit-marker.$$"
+    KIT_MB_START="$start" KIT_MB_END="$end" KIT_MB_CONTENT="$content" awk '
+        BEGIN { s = ENVIRON["KIT_MB_START"]; e = ENVIRON["KIT_MB_END"]; c = ENVIRON["KIT_MB_CONTENT"] }
+        $0 == s { print s; print c; print e; inblk = 1; done = 1; next }
+        $0 == e && inblk { inblk = 0; next }
+        inblk { next }
+        { print }
+        END { if (!done) { print s; print c; print e } }
+    ' "$file" > "$tmp" && mv "$tmp" "$file"
+}
+
 # kit_next_id <file> <prefix>
 # 掃檔案取 <prefix>-NNN 的最大值 +1，補三位數。空檔／缺檔回 <prefix>-001。
 #

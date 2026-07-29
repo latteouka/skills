@@ -2,3 +2,7 @@
 
 # SDD worktrees
 .worktrees/
+
+# wave worktrees 與 SDD scratch（wave skill 慣例）
+.claude/worktrees/
+.superpowers/
