@@ -11,3 +11,4 @@ scripts/wave-close.sh	kit:original	-	-	sha256:d15a2fb09accb4c2222ddf72b2740e1fb5
 scripts/wave-registry.sh	kit:original	-	-	sha256:8270f043816b30a3b875f005c50a7025665d45ee055946bb42c4ca47fd7c51da	2026-07-30	verbatim	-
 lib/common.sh	kit:original	-	-	sha256:ee24d31045e1ccae1883447c6b2d857ac62f59ee70ae16f3a00e56f31520f52b	2026-07-30	verbatim	-
 installers/intake.sh	kit:original	-	-	sha256:ab9e59400b000fdd840426c8d0a1e75d92d7e5d4bc97d290523f1c782e53933b	2026-07-30	verbatim	-
+tools/kit-audit.sh	kit:original	-	-	sha256:f8b9ae22e5679ab7860d4d0d57a73a03d5b3017f8ecc84538cd2e1e9424af0c4	2026-07-30	verbatim	-
