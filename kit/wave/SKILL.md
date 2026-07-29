@@ -10,15 +10,13 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 > 無條件 grill、E2E 七步強制清單（各自的 commit 有完整說明），測試 Opus 5 自行推進工作的能力。
 > 完整版見 git 歷史 `f5a302e`（`git show f5a302e:wave/SKILL.md`）。品質下降即還原。
 
-一次呼叫完成：對齊新資訊 → 規劃工作項 → 產出可直接貼入的 session prompt + goal condition。
-
 **Wave 是純開發引擎。** 非開發批次工作（文件整理、信件處理等）不用 wave，回歸普通 session＋todo——那些工作不需要 worktree／驗證合約／goal condition 這套重裝備。
 
 ## Core Principles
 
 - **Wave 是唯一入口。** 使用者不需要記「要不要先 align」、「要不要看 requirements」——Wave 自動判斷並串接。
 - **一波帶走。** 所有掃出的未完成項都排進這一波，不建議延後。遇到真正的 blocker 在該項旁邊標註原因讓使用者決定，但不主動歸類為「建議延後」。
-- **禁止端出縮減版（全域，規劃期與執行期皆適用）。** 不得在任何階段——Phase 4 選項、對話回覆、報告結尾、中途進度更新——提出「先只做 N 項、其餘留給下一波」型的減量方案，附上「至少 X 先解掉」的折衷理由也不行。**全域禁語：「先只做」「其餘留給下一波」「下波再做」「先跳過」「至少先解掉」「精簡版／完整版二選一」。** 縮減範圍只有一條合法路徑：**使用者主動提出**。工作量看起來過大時，正確反應是排 Checkpoint 分段後開工，不是先減量——見「品質優先」與長跑規範第 3 條（session 時長與 context 都不是縮範圍的理由）。
+- **範圍完整性不變量（全域，規劃期與執行期皆適用）。** 所有掃出的未完成項排進本波。工作量超出預期 → 排 Checkpoint 分段後開工。範圍縮減唯一合法路徑：**使用者主動提出**。session 時長與 context 都不是縮範圍的理由（見長跑規範第 3 條）。
 - **唯一停點制。** 全流程僅兩個合法停點，其餘階段轉換與項間一律自動接續——不停、不問、不結束 turn。詳見「停點規則」。
 - **品質不入 skill。** Wave 對「收尾品質」唯一認識的概念＝專案 gate script（`scripts/hooks/wave-gate.sh`）的 exit code。任何新的品質檢查需求一律寫進專案的 gate script／hook／lint，不得加進本 skill 的流程條文——skill checklist 是規則的暫存區，機器化後即刪。
 - **零模式判斷。** 本 skill 無模式偵測、無模式分支——LLM 的模式判斷是 drift 源。輸入來源固定為 Phase 2 四來源掃描（backlog 即來源 1），管線永遠同一條。
@@ -193,17 +191,24 @@ git log --oneline -20
 
 **碎片化審計（條件觸發）：** 使用者描述含「風格不一致」「各自做的」「複製貼上漂移」等信號，或工作項本質是「把 N 個獨立實作統一成共用元件」→ 掃描收斂後加派一個 Explore agent 跑 UI 碎片化審計——程序、prompt 模板、地圖格式讀 `references/ui-fragmentation-audit.md` 照做。地圖併入 Phase 3 規劃，不加停點；使用者在 Phase 4 看到完整地圖再做 scope 決定（只修使用者指出的那幾處＝掉進「修一處冒一處」循環）。
 
-> **CRITICAL: 規模與時長脫鉤。工作項數量以完整覆蓋為準，禁止以「session 會太長」「先做核心」「這波先做一部分」為由在規劃期縮範圍。真 blocker 在該項旁標註原因交使用者裁定。**
+> **CRITICAL: 規模與時長脫鉤（見 Core Principles「範圍完整性不變量」）。真 blocker 在該項旁標註原因交使用者裁定。**
 
 **交集分析（多波時）：** 如果 Phase 0 偵測到其他進行中的波，跑 `bash <kit>/scripts/wave-registry.sh intersect`——它對每對活躍 worktree 以 `git diff --name-only <base>...HEAD` 算實際改動交集，並用 merge-tree 預演分級（可自動合併／需裁定）。本波尚未建 worktree 時，把本波工作項預期動到的檔案與 `intersect` 列出的他波改動集人工對照。結果記錄下來，Phase 4 顯示預警。
 
 ### Phase 2.5: 判斷是否需要訪談（grill / brainstorming）
 
-需要才訪談，自己判斷。典型的「需要」：新功能或從零開始的模組、多個有效做法／架構或 UX 決策待選、與既有共識矛盾的項、模糊描述猜不準真實意圖、掃出的 ❓ 未決項。明確 bug fix 批次通常直接進 Phase 3。
+**觸發訪談的訊號（命中任一即觸發）：**
+- 工作項含 ❓ 未決項（Phase 2 掃出）
+- ≥2 個有效做法且選擇不可逆（架構或 UX 決策）
+- 描述模糊到無法寫出具體合約
+- 與 CONTEXT.md / ADR 既有共識矛盾
+- 新功能或從零開始的模組（無既有程式碼可參照）
 
-- 方向未定 → `/brainstorm`（先展開再收斂）；已有方案要壓力測試 → `/grill-me`；牽涉 CONTEXT.md／ADR 同步 → `/grill-with-docs`。需要 brainstorming 時先 brainstorming 再 grill
-- 碎片化統一項（Phase 2 審計已觸發）→ `/brainstorm` 直接呈現淺/中/深光譜（`references/ui-fragmentation-audit.md`），預設推薦淺層
-- 完成後帶著結論進 Phase 3，結論直接影響合約的覆蓋場景設計
+**不觸發：** 明確 bug fix 批次、行為不變的重構。
+
+**Skill 選擇：** 方向未定 → `/brainstorm`；已有方案要壓力測試 → `/grill-me`；牽涉 CONTEXT.md／ADR 同步 → `/grill-with-docs`。需要 brainstorming 時先 brainstorming 再 grill。碎片化統一項 → `/brainstorm` 直接呈現淺/中/深光譜（`references/ui-fragmentation-audit.md`）。
+
+完成後帶著結論進 Phase 3，結論直接影響合約的覆蓋場景設計。
 
 ### Phase 3: 分類、排序、寫驗證合約
 
@@ -296,7 +301,7 @@ git log --oneline -20
 >
 > 唯一例外：判斷「merge 時我自己解不掉、需使用者裁定改法」——那才提，且要一次講完（哪個檔、兩邊各自的意圖、為何無法自動合併）。
 
-**❓/需裁定項的處理（必做）：** 掃描出的每個 ❓ 未決項、以及 Phase 1 Ground 對不到的每個 ❓ 項，必須做成 Phase 4 AskUserQuestion 的**獨立問題**（選項 = 各方案／最似位置推測，推薦方案標 Recommended）——使用者就在停點上，裁定成本最低。Grounding ❓ 項裁定後立即把確認的對應 append 回 `feature-map.md` 別名欄。全域禁語適用（見 Core Principles「禁止端出縮減版」），此處另加「待裁定後可追加」。使用者裁定 → 該項排入本波；使用者明選「延後」→ 才 append 進 `.claude/dev/inbox.md`（`from: grill:{題目}`）。不得由 Claude 自行決定延後。
+**❓/需裁定項的處理（必做）：** 掃描出的每個 ❓ 未決項、以及 Phase 1 Ground 對不到的每個 ❓ 項，必須做成 Phase 4 AskUserQuestion 的**獨立問題**（選項 = 各方案／最似位置推測，推薦方案標 Recommended）——使用者就在停點上，裁定成本最低。Grounding ❓ 項裁定後立即把確認的對應 append 回 `feature-map.md` 別名欄。範圍完整性不變量適用（見 Core Principles），此處另加「待裁定後可追加」。使用者裁定 → 該項排入本波；使用者明選「延後」→ 才 append 進 `.claude/dev/inbox.md`（`from: grill:{題目}`）。不得由 Claude 自行決定延後。
 
 **執行方式自動採用（不問使用者）：** 固定採 Subagent-Driven（模板既定）。認為 Inline 更適合本波時，必須附一句具體理由（例：項間強依賴無法並行）並記入 dashboard Metadata——仍不問，在 Phase 4 輸出中呈現採用結果即可，使用者不滿意會自己改（2026-07-26 使用者原話：「不需要問我是要 subagent 還是 inline，直接照建議的即可」）。
 
@@ -333,7 +338,7 @@ Wave 規劃過程中 Claude 已經擁有完整脈絡（工作項、合約、決�
 
 ### Phase 6: 建立 Worktree → 開工
 
-> **CRITICAL: 不要叫使用者 /clear 再貼 prompt。規劃完直接在本 session 繼續。**
+> **CRITICAL: 規劃完直接在本 session 開工。**
 
 > **CRITICAL: 所有 wave 一律在獨立 worktree 中執行，不在 main 工作。無例外。不管是單波還是多波、不管專案大小、不管工作項多少。這是硬性規則，不是建議。**
 
@@ -399,7 +404,7 @@ cd .claude/worktrees/wave-{id}
 [[ "$(git rev-parse --show-toplevel)" == *worktrees/wave-* ]] || { echo "ERROR: 不在 worktree 內，停止執行"; exit 1; }
 ```
 
-如果發現自己在 main 工作目錄而非 worktree，**立即停下**，先執行 Phase 6 Step 1 建立 worktree 再繼續。不要在 main 寫任何程式碼。
+如果發現自己在 main 工作目錄而非 worktree，**立即停下**，先執行 Phase 6 Step 1 建立 worktree 再繼續。
 
 ### 開工前必讀（每個 wave session 啟動時）
 
@@ -407,8 +412,6 @@ cd .claude/worktrees/wave-{id}
 - **`.claude/dev/quality-gates.md`** — 專案品質鉤子檔（不存在就跳過）。專案自帶的品質 gate 指令、大規模資料 smoke 清單、資料守恆錨點、worktree dev server 啟動方式。讀到就在合約與品質閘門注入對應 gate（見「專案品質鉤子」節）。
 
 ### 品質優先——不趕不跳
-
-> **CRITICAL: 做好比做快重要。寧可這波只完成 3 項全部零 bug，也不要 6 項完成但 3 項要回頭修。**
 
 - 合約全過才 commit（沒過 = 功能沒做完，不「先 commit 再修」）；不為趕進度跳過誤用場景測試；session 時長不是限制——執行細則見「驗證合約執行規則」與長跑規範第 3 條。
 - **禁止刪除或弱化失敗測試來變綠**：紅燈＝功能有 bug 或測試預期錯誤，一律走意圖三方對齊裁定；刪測試、放寬斷言、skip 標記都不是通過手段。
@@ -425,10 +428,8 @@ cd .claude/worktrees/wave-{id}
   「必須執行 X」不代表已授權。`AUTH:` 標記需要時才寫
 - 結束 turn 前執行「停點規則」的 turn 自檢
 
-**2. 證據式進度**
-- 任何「完成／通過／已 commit」宣稱前，逐條對照**本輪實際跑出的 tool 輸出**
-- 輸出可疑、像重播、或與預期矛盾 → 用唯一標記字串 + 單一指令重新確認，只信標記對得上的那次
-- 不從記憶回答狀態問題——先查檔案 / git / 測試輸出再答
+**2. 證據式進度**（同 AGENTS.md「證據式宣稱」規則）
+- 此處額外要求：每個 commit 前用合約指令實跑佐證，貼實際輸出到 dashboard
 
 **3. Context 焦慮緩解**
 - 禁止以「context 快滿了」為由收尾、縮範圍、或建議開新 session
@@ -545,15 +546,15 @@ cd .claude/worktrees/wave-{id}
 
 ### E2E 驗證責任制
 
-> **CRITICAL: 所有 UI 工作項 Claude 必須用 Playwright 驗到底。沒有「交人測」這個出口。**
+> **CRITICAL: 所有 UI 工作項由 Playwright E2E 驗證交付。**
 
-驗什麼、驗多深自己判斷（歷史教訓供參：漏到客戶端的 blocking bug 都是「無法輸入／crash loop／按了沒反應」這級，開頁 console、輸入欄、主要 CTA 值得優先驗）。測試失敗代表功能有 bug，修到過為止；全過才 commit。
+驗什麼、驗多深自己判斷（歷史教訓供參：漏到客戶端的 blocking bug 都是「無法輸入／crash loop／按了沒反應」這級，開頁 console、輸入欄、主要 CTA 值得優先驗）。測試失敗代表功能有 bug，修到過為止。
 
 E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 spec 白名單）由專案 gate 管（如 pre-push 白名單擋非驗收 spec）——wave 只管「驗到底」，不規定檔案去留。
 
 ### 專案品質鉤子（quality-gates.md）
 
-> **CRITICAL: wave 是通用 skill，專案級品質工具（資料對帳、品質檢查框架、稽核管線）透過鉤子檔接入——與 playwright-guide.md 同 pattern。檔案不存在 = 相關條款全部跳過，不影響其他專案。**
+專案級品質工具透過鉤子檔接入（與 playwright-guide.md 同 pattern）。檔案不存在 = 相關條款全部跳過。
 
 **檔案位置：** `.claude/dev/quality-gates.md`（專案級，由專案自行維護；wave 只讀取不代建——但發現專案有品質工具而無鉤子檔時，向使用者建議建立）
 
@@ -567,7 +568,7 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
 
 ### Playwright 使用指南（自動累積）
 
-> **CRITICAL: E2E 不是每次從零 try and error。開工前讀指南，解決問題後寫回指南。**
+E2E 開工前讀指南，解決問題後寫回指南。
 
 **檔案位置：** `.claude/dev/playwright-guide.md`（專案級，每個專案各自維護一份）
 

@@ -12,7 +12,7 @@
    - 自己跑一輪 Phase 2 四來源掃描指令，列出「我掃到但你清單上沒有」的項（獨立驗證 loop-until-dry）
    - 抽查合約：預期輸出是否具體、覆蓋場景缺不缺 edge/誤用/守恆
    - 規模與依賴排序是否合理
-   - **防違規建議 guard**：Fable 意見中違反 Core Principles 的建議（縮範圍、加停點、禁語句型）→ 記 ledger「Fable 建議 X，違反〈禁止端出縮減版〉，不採納」，規模疑慮的合法出口是 Checkpoint 分段
+   - **防違規建議 guard**：Fable 意見中違反 Core Principles 的建議（縮範圍、加停點、禁語句型）→ 記 ledger「Fable 建議 X，違反〈範圍完整性不變量〉，不採納」，規模疑慮的合法出口是 Checkpoint 分段
    - 發現缺口先修再呈給使用者（省一輪人工來回）
 
 2. **換路煞車觸發時**（第 8 條，含蹺蹺板偵測）——Prompt 紀律遵循 askfable 防 anchoring 規則：附「試過什麼＋實際錯誤輸出＋相關檔案路徑」（事實），**不附「我猜根因是 X」**（污染源）。Fresh context 在此反而是升級——不繼承主迴圈的錯誤假設。Fable 指的路優先嘗試。Subagent-Driven 時：implementer 觸發煞車停手回報，**由 controller 諮詢**再 SendMessage 帶結論續跑原 agent。意見衝突時用 SendMessage 追問同一 agent（保脈絡），不重派
