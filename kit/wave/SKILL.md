@@ -140,11 +140,11 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 
 > **開波前自動 triage（不停、不問，不算「停點規則」新停點）：** 來源 3 判定為「收件匣未整理項 > 0」
 > 時（見下方 bash，`inbox.md` 存在才會進這個分支），先讀 `~/projects/skills/kit/references/triage-rules.md`
-> 全文並對 `inbox.md` 執行 triage（結果寫入 `backlog.md`），再回頭掃來源 1。此步驟與其餘來源掃描同屬
+> 全文並對 `inbox.md` 執行 triage（結果寫入 `backlog/`），再回頭掃來源 1。此步驟與其餘來源掃描同屬
 > Phase 2 自動執行範圍，開波本身即代表要取料，不產生新的等待輸入節點。
 >
 > **intake kit 缺席降級（比照「相依 Skill 缺席降級」pattern，非靜默跳過）：** 未裝 intake kit 的專案
-> （無 `backlog.md`／`inbox.md`／`triage-rules.md`）→ 開波前自動 triage、⚠️ 硬閘門、分流三條連帶不適用
+> （無 `backlog/` 目錄且無 `backlog.md`／無 `inbox.md`／無 `triage-rules.md`）→ 開波前自動 triage、⚠️ 硬閘門、分流三條連帶不適用
 > （沒有 backlog 就沒有 `status`／`flow` 欄位可讀）。來源 1（backlog 掃描）明確無產出——這是「未裝
 > intake kit」，不是「掃不到所以沒有待辦」；來源 3 自動退回掃舊 wave 的「📋 延後決策」（wave 原生格式，
 > 不依賴 intake kit，見下方 bash）。ledger 記一行「無 intake kit，來源 1 無產出、來源 3 走 fallback」；
@@ -159,8 +159,12 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 自動執行（不問使用者），四個來源：
 
 ```bash
-# 來源 1：backlog 待排波項；無 backlog.md＝該專案未裝 intake kit，本來源無產出（見上方降級揭露）
-grep -E '\| (ready) \|' .claude/dev/backlog.md 2>/dev/null
+# 來源 1：backlog 待排波項；無 backlog/ 目錄（且無 backlog.md）＝該專案未裝 intake kit
+if [ -d .claude/dev/backlog ]; then
+  bash scripts/backlog-ls.sh --status ready 2>/dev/null
+elif [ -f .claude/dev/backlog.md ]; then
+  grep -E '\| (ready) \|' .claude/dev/backlog.md 2>/dev/null
+fi
 
 # 來源 2：程式內待辦標記
 grep -rn "TODO\|FIXME" src/ lib/ app/ 2>/dev/null | head -50
@@ -508,60 +512,9 @@ cd .claude/worktrees/wave-{id}
 3. 讀 `wave-{id}.md` + ledger RESUME POINTER，比對 git 狀態，不一致以 git 修正文件
 4. 從第一個真正未完成項續跑
 
-### Subagent-Driven 長跑協議（選 Subagent-Driven 執行方式時適用）
+### Subagent-Driven 長跑協議
 
-主 session 作為 controller，額外遵循：
-
-**Brief-driven 派工：**
-- 每個 implementer 的 brief 以**第 0 項（執行紀律）開頭**，再接六要素。第 0 項必須是 brief 的**第一段**、逐字含「**違反任一條＝任務失敗**」宣告——實證（2026-07-28 matrix-hardening）：同樣條文寫在 brief 中段被跳過（累計 ≥3 次），提為開頭＋失敗宣告後四個 agent 零違規。controller 組 brief 時直接複製下面這段放最前面：
-
-  > **【第 0 項・執行紀律——違反任一條＝任務失敗】**
-  > ①長跑指令（E2E／測試／build）一律**前景執行**、Bash timeout 拉高（600000ms 級）——你等自己的背景 run 永遠不會被喚醒；
-  > ②同 worktree 並行工作時 commit 一律 **`git commit -- <pathspec>`** 限定路徑——共用 git index 下無 pathspec commit 會把別人 staged 的檔案掃進你的 commit。
-
-- 六要素：
-  1. 需求描述 + 裁定結論
-  2. 程式現況（`file:line` 引用，註明「行號可能漂移，以語意定位」）
-  3. 驗證合約（從 dashboard 複製該項完整合約）
-  4. 硬約束（不可碰的檔案/目錄，如其他波涉及範圍）
-  5. 非目標（明確不做的事，至少一條——防順手改、防 scope 蔓延）
-  6. 停止條件（遇到即停手回報：要動範圍外檔案、要刪東西、發現機密、與硬約束衝突）
-- **Brief 分級**：小項（單檔、合約短）→ 第 0 項＋六要素完整內嵌 Agent prompt 即可；大項（schema 變更、跨系統、多檔）→ 必須落檔 `task-N-brief.md` 並另寫 `task-N-design.md`，**落檔後先派 `/askfable` 審查**（諮詢點 3），再呈使用者 review 才動手（三件套 brief/report/design 放 worktree 的 `.superpowers/sdd/` 下——gitignored scratch 不進版控）
-- Subagent 開場指令 =「先讀你的 brief，它就是你的 requirements」（內嵌時 prompt 本身即 brief）——subagent 不依賴 controller 的對話 context
-- **模型分層**：派工時依項目性質選 model tier——機械、範圍明確的實作項 → `model: "sonnet"`；瑣碎查證/整理 → `haiku`；跨系統、架構性、難 debug 的項 → 省略（繼承 session 模型）。拿不準就省略。Reviewer 的 tier 不得低於該項 implementer。**每筆派工的 ledger 條目必須帶 model tier**（例：`派工 task-3 implementer（sonnet）`），tier 切換有跡可查
-- Implementer 完成**一律**交付 report：大項寫 `task-N-report.md`；小項可改為回填鏡像 Task 的 description 或在回報訊息附完整合約輸出。controller 與 reviewer 都讀
-
-**管線不斷料（pipeline priming）：**
-趁當前 task 在跑，controller 預寫下一批 brief、做前置預檢（DB 起了沒、測試環境可用嗎）——不閒等。
-
-**心跳 fallback（ScheduleWakeup）：**
-- 每次派背景 subagent 後，排一個 ScheduleWakeup fallback（環境無此工具則跳過此保險）——背景完成通知失靈時的斷線保險。delay 分兩層：
-  - **長跑 implementer**（實作/實驗，10 分鐘以上）→ 1200s+，非短輪詢
-  - **數分鐘內將完成的一批 agent**（並行比對/掃描組）→ 短窗輪詢，delay 對齊該批預計完成時間；該批收完換回長層。cache TTL 等環境常數不硬編進排程理由——依當期 harness 說明為準
-- Wakeup prompt **完整重述狀態**，不依賴記憶即可續泵。模板見 `references/templates.md` 的「心跳 Wakeup Prompt 模板」節，排 wakeup 時照填。
-
-- **Stale wakeup 核實**：喚醒內容與現實可能脫節（說 X 實作中但其實已 commit）→ 先核 git 真實狀態再行動，不盲從喚醒內容、也不盲從記憶。喚醒內容與使用者最後指示衝突時，問人不擅斷
-- 與 `/goal` 分工：goal 判定「做完了沒」，心跳保證「沒做完就繼續動」
-
-**中斷恢復優先 SendMessage 續跑：**
-曾有實際產出的 agent 因額度上限、網路中斷、環境守門或使用者暫停而停止 → **不重派**，用 SendMessage 對原 agent 續跑（context 全保留）。訊息結構：
-
-```
-Controller 通知：[中斷原因 + 現況，如「額度已重置」「網路已恢復（PG 連通、API 回 200，皆已驗證）」]。
-先 `git status` + `git log --oneline -3` 核實你已落地與未落地的工作，再從斷點繼續。
-[中斷期間有作廢產出時明確指出：「X 被中途 kill，視為無效、重跑」]
-```
-
-SendMessage 失敗（agent 已死）或該 agent 屬空跑 → 才走重派。
-
-**Controller 代看門：**
-Subagent 依賴背景等待（Monitor、背景 process 輪詢）卻沒被喚醒 → controller 接管看門（自己盯 process/log），用 SendMessage 代通知「X 已結束，結果在 Y」。同一 agent 第二次失靈 → 後續指令禁用該等待模式（改前景執行），並記入 ERRATA。
-
-**空跑偵測：**
-Subagent 回傳異常（0 tool uses、秒級返回、無 commit）→ 視為沒實際執行。核 git 確認無半成品後重派，不把空跑當完成。
-
-**Reviewer 不信報告：**
-每 task 的 reviewer 必須**親自重跑**測試/typecheck/lint，不採信 implementer 的 report 文字。權限/安全敏感項升級 security rigor。共用 branch 交錯時，review 範圍用明確 commit SHA 指定，不用 range。
+選 Subagent-Driven 執行方式時讀 [references/subagent-protocol.md](references/subagent-protocol.md) 照做（Brief 第 0 項執行紀律、派工六要素、Brief 分級、模型分層、心跳 fallback、中斷恢復 SendMessage 優先、空跑偵測、Reviewer 不信報告）。
 
 ### 驗證合約執行規則
 
@@ -704,77 +657,8 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
 
 ## 多波並行
 
-> 支援多波同時在同專案內開發——各自獨立規劃、獨立 dashboard、獨立 session，互不干擾。
-
-### 隔離策略
-
-Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由和並行安全保證。
-
-**為什麼不在 main 工作：** 使用者經常在多個 tmux session 同時對同專案開 wave。如果有「單波在 main」的路徑，兩個 session 同時啟動就會 race condition——都以為自己是第一個。一律 worktree 從設計上消除這個問題，不需要偵測、不需要旗標。單波也一樣——規則統一才不會有漏洞。
-
-**並行安全保證：**
-1. 所有波在獨立 worktree 工作，互不影響 working tree
-2. 每個波只讀寫自己的 `wave-{id}.md`
-3. `playwright-guide.md` 併發寫入處理：每個 worktree 維護自己的副本，merge 回 main 時自動合併（append-only 格式天然可合併）
-4. `prisma/schema.prisma` 等共用檔案的衝突在 merge 階段處理（見合併協助段落）
-
-### `/wave batch` — 批次規劃多波（backlog 一次排完）
-
-使用者說「讀 backlog 看能開幾波」「全部排波」「一次給我所有 wave prompt」＝進本模式。
-
-1. **取料**：讀 `backlog.md` 全部 `ready` 項（⚠️ 硬閘門照舊：`⚠️需客戶確認` 不取）
-2. **分波**：依每項預期動到的檔案範圍分組——不相交的組＝可並行各開一波；相交的項合進同一波；
-   有依賴關係的標啟動順序（後波在前波 merge 後開）。分組結果連同「預測交集」表**先派 `/askfable` 審查**（諮詢點 4：檔案範圍分組有無漏算的相交、依賴順序有無成環或顛倒、「可並行組合」是否高估），修正後再呈使用者過目
-   （此時無 commit 可 diff，交集是預測非實測，標明）
-3. **逐波產出**：每波各走 Phase 3～5（工作項＋合約＋dashboard `wave-{id}.md`＋session prompt
-   ＋goal condition）——batch 只改「一次規劃幾波」，不簡化任何單波的管線
-4. **總表收尾**：波數、每波一句話範圍、建議啟動順序、可同時開的組合。使用者拿各 prompt
-   分別開 session；各 session 開場的多波感知 hook（wave-awareness）會自動接手實測交集
-
-### `/wave status` — 全局概覽
-
-任何時候可呼叫，動態掃描所有波次狀態：
-
-**資料來源：** `bash <kit>/scripts/wave-registry.sh list`（branch、已改檔數、未 commit 數、最後 commit 時間）+ 各 worktree / main 的 `.claude/dev/wave-*.md`。
-
-輸出格式見 `references/templates.md` 的「`/wave status` 輸出範例」節，動態填入實際掃描結果。
-
-找不到 dashboard 的波標「資訊不可用」。🗑️ 狀態的波不顯示。
-
-### `/wave drop {id}` — 放棄一波
-
-1. 把 `wave-{id}.md` 狀態標 🗑️
-2. `/wave status` 不再顯示該波
-3. 不自動刪 worktree 或檔案——使用者想清理就手動清
-
-### 合併協助
-
-每波在 worktree 完成後，merge 回 main：
-
-1. merge 本波 branch 到 main——branch 名以 ledger 開工記錄為準（手動流程＝`wave/{id}`，原生 EnterWorktree＝harness 命名如 `worktree-wave-{id}`），不憑記憶猜
-2. 加法衝突（兩波各加不同欄位到同檔案）→ 自動合併
-3. 改法矛盾（同一行改成不同東西）→ 列出衝突 + 兩波原始意圖，使用者裁定
-4. **Merge re-gate（強制，貼輸出才算合併完成）**：在 main 上依序跑 ① `bash scripts/hooks/wave-gate.sh 收尾`（存在時；不存在則 typecheck＋fast tier 測試）② 受影響 view 的 E2E 子集（本波改動檔案對應的 golden-path spec，不整套跑）——任何紅燈先修再宣告合併完成。理由：merge 殘留 TS 錯誤曾多次上 main
-5. **UX 補跑回收**：本波品質閘門若觸發降級規則（「待 UX 補跑」），此時 dev server 可用——立即補跑並回寫 wave-{id}.md，補跑完成才把狀態升級為「✅ 完成」
-6. 清理 worktree：環境有 `ExitWorktree` 工具用 `ExitWorktree({ action: "remove" })`；`discard_changes` 屬破壞性選項，僅在親自確認 worktree 無未合併變更後使用
-
-不自動 force merge——有矛盾必停，呈現衝突 + 推薦方案，使用者確認才執行。
+多波並行規則（隔離策略、`/wave batch`、`/wave status`、`/wave drop`、合併協助）讀 [references/multi-wave.md](references/multi-wave.md)。收尾流程步驟 5 的合併協助亦在該檔。
 
 ## Harness 適配（Codex CLI）
 
-> 本 skill 的行為規範 harness 中立，條文預設用 Claude Code 工具名。在 **Codex CLI** 下執行時按下表替換工具呼叫——所有停點規則、驗證合約、品質閘門、長跑規範**一字不變**。
-
-| Claude Code 工具 | Codex CLI 等效 |
-|---|---|
-| `EnterWorktree({ name })` | `git branch` + `git worktree add` 建立 worktree 後，**必須結束當前 session、在 worktree 目錄開新 session**（`cd <worktree> && codex`）——Codex 的指令鏈與 hooks 在 session 啟動時定死，shell 內 `cd` 不會重載，同 session 繼續＝指令檔/hooks/相對路徑全部仍指向主 checkout（不是支援的 fallback，是錯誤用法）。新 session 開場驗證四項：`pwd`、`git rev-parse --show-toplevel` 含 worktrees/wave-{id}、loaded instructions（/status）、hooks 生效。sandbox 對 `.git` 寫入需 approval 屬預期。**tmux 視窗名**：從 worktree 目錄啟動 codex 時 pane_current_path 已在 worktree，automatic-rename 天然生效，免手動 rename |
-| Agent 背景派工＋完成通知 | `spawn_agent` 派子代理 + `wait_agent` 收割。Codex 子代理是**同步收割模型**：派一批 → 期間做 pipeline priming（預寫下批 brief、前置預檢）→ `wait_agent` 逐一收割。不存在「失聯」問題 |
-| `SendMessage` 續跑原 agent | `send_input` 對原子代理續話（中斷恢復、諮詢追問同此） |
-| `ScheduleWakeup` 心跳 fallback | 不適用——`wait_agent` 阻塞等待，無失聯風險。ledger 記一行「Codex 模式，心跳條款不適用」 |
-| `AskUserQuestion` 結構化停點 | 純文字問答（Phase 0 / Phase 4 停點照問，僅呈現格式退化，停點規則不變） |
-| `TaskCreate` / `TaskUpdate` 鏡像 | 走既有缺席條款：ledger 記一行「無 Task 工具，跳過鏡像」 |
-| `/askfable` 諮詢 | 走既有「相依 Skill 缺席降級」：ledger 記「本波無 Fable 諮詢」，收尾報告品質 caveat 列出 |
-
-**Codex 執行注意：**
-
-- 建議 `approval_policy = "on-request"`——worktree 內 git 寫入（commit、worktree add）會觸發 approval 升級，屬 sandbox 摩擦非錯誤（upstream openai/codex#14338）
-- Dashboard / ledger / 驗證合約 / goal condition 全是檔案慣例，兩個 harness 產物同格式——收尾稽核可由任一 harness 親跑重驗
+Codex CLI 執行時工具替換表讀 [references/codex-adaptation.md](references/codex-adaptation.md)。所有停點規則、驗證合約、品質閘門、長跑規範一字不變，僅工具呼叫名替換。

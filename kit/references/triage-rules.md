@@ -1,6 +1,6 @@
 # Triage 判斷樹
 
-對 `inbox.md` 中每一筆 `## INB-NNN` 執行下列步驟，結果寫入 `backlog.md`。
+對 `inbox.md` 中每一筆 `## INB-NNN` 執行下列步驟，結果寫入 `backlog/` 目錄（一筆一檔 `backlog/B-NNN.md`，ID 由 `scripts/next-id.sh --touch B` 原子取號）。
 
 ## -1. 先合併分片（inbox.d/ 存在時必做第一步）
 
@@ -18,7 +18,7 @@
 
 ## 0. 兩個入口——分界是「判斷完成了沒」，不是「誰寫的」
 
-**能填得出 `type` / `flow` / `matrix` 三個欄位 → 直接寫 `backlog.md`，跳過 inbox。**
+**能填得出 `type` / `flow` / `matrix` 三個欄位 → 直接寫 `backlog/B-NNN.md`（`scripts/next-id.sh --touch B` 取號），跳過 inbox。**
 **填不出來（或當下沒時間查證）→ 寫 `inbox.md`，等 triage。**
 
 | 來源 | 走哪 | 為什麼 |
@@ -30,7 +30,30 @@
 | 另一個 session 主動加的工作 | 判斷完成 → **backlog** | 它有時間做完整判斷，不需要繞一圈 |
 | wave 收尾的 ERRATA 升級候選（`from: errata:*`） | **inbox** | 走專屬判定（見 4.5），不套 type／flow 判斷樹 |
 
-直接寫 backlog 時，仍要走完步驟 1–4 的判斷（只是省掉「先落 inbox 再回頭處理」那一趟），並在明細區的 `from` 欄註明來源（例：`from: 自查（wave-intake-kit 執行中）`）。
+直接寫 backlog 時，仍要走完步驟 1–4 的判斷（只是省掉「先落 inbox 再回頭處理」那一趟），並在 frontmatter 的 `from` 欄註明來源（例：`from: "自查（wave-intake-kit 執行中）"`）。
+
+**backlog 檔案格式**（frontmatter + body）：
+```yaml
+---
+id: B-NNN
+type: BUG           # BUG | NEW | CHORE | SPEC_CHANGE
+pri: P2             # P0..P4
+flow: spec          # direct | spec
+status: "ready"     # ready | done:<wave-id> | dropped:<理由> | ⚠️需客戶確認 | orphan-review
+matrix: "—"         # RTM 條目或 —
+closed: 2026-07-29  # done/dropped 時寫入日期（ready 不填）
+from: "INB-112"
+touches:            # status=ready 必填
+  - apps/web/src/server/api/routers/xxx.ts
+created: 2026-07-29
+---
+## evidence
+（敘事）
+## proof
+（done/dropped 必填——commit hash／實跑輸出）
+## notes
+（其餘）
+```
 
 **判斷不完整就不要硬填**——填錯的 `flow` 會讓大改動溜進 `direct` 而略過設計階段，比多繞一趟 inbox 貴得多。
 
@@ -72,7 +95,7 @@ grep -rn "<關鍵詞>" <spec_layer>
 
 ## 3. 去重
 
-與 `backlog.md` 既有項比對（同 matrix 條目 + 語意相近）→ 命中則併入既有項的 `from` 欄，不新增條目。
+與 `backlog/` 目錄既有 B-NNN.md 比對（同 matrix 條目 + 語意相近）→ 命中則併入既有檔的 `from` 欄，不新增條目。查詢用 `bash scripts/backlog-ls.sh --status ready` 或 `grep -al` 掃 frontmatter。
 
 ## 4. 分流判定（flow 欄位）
 
@@ -94,7 +117,7 @@ grep -rn "<關鍵詞>" <spec_layer>
 
 ### 4.1 `touches` 填寫與交集預警
 
-每筆 `status: ready` 的明細都必須有一行 `- **touches**:`。值是預計會寫入的檔案，
+每筆 `status: ready` 的 backlog 檔 frontmatter 都必須有 `touches:` 欄位。值是預計會寫入的檔案，
 不是只讀的參考資料：
 
 - 已知單一檔案時填 repo root 起算的 exact path，例如
@@ -126,7 +149,7 @@ Subagent-Driven 的心跳 prompt——Inline 執行、compaction 後、下一波
 
 | 判定 | 落點 | 動作 |
 |---|---|---|
-| 補 gate（收尾 Q2 判為機器可擋） | `backlog.md` | `type: CHORE`＋`flow` 照規模判；`raw` 寫清楚擋什麼、擋在哪一層（gate script／lint rule／測試） |
+| 補 gate（收尾 Q2 判為機器可擋） | `backlog/B-NNN.md` | `type: CHORE`＋`flow` 照規模判；evidence 寫清楚擋什麼、擋在哪一層 |
 | 升級候選: CLAUDE.md（收尾 Q1+Q3 全過） | 專案 `CLAUDE.md` | 見下方收錄規則 |
 | 收尾未附判定結果 | — | 退回：在 inbox 標 `status: ⚠️缺判定`，要求補三問結果再處理，**不代為判斷** |
 
@@ -152,7 +175,7 @@ Subagent-Driven 的心跳 prompt——Inline 執行、compaction 後、下一波
 
 ## 6. 收尾
 
-- 已處理的 `INB-NNN` 從 `inbox.md` 移除（其內容已轉入 backlog 的 `from` 欄）
+- 已處理的 `INB-NNN` 從 `inbox.md` 移除（其內容已轉入 `backlog/B-NNN.md` 的 `from` 欄）
 - **移除條目後必須更新檔內 high-water mark**：`<!-- INB-seq: NNN -->`（NNN＝本批最大編號）
   ——`kit_next_id` 靠它在條目清空後仍接續編號，漏寫＝下一筆從 001 起與 git history 撞號
   （2026-07-28 dfaa 實見）。註記放檔頭歷史指標區，每批 triage 更新為新最大值
