@@ -49,8 +49,15 @@ if [ -f "${dev}/inbox.md" ]; then
     fi
 fi
 
-# backlog stale 項
-if [ -f "${dev}/backlog.md" ]; then
+# backlog 待排波項
+if [ -d "${dev}/backlog" ]; then
+    # 一筆一檔格式：掃 frontmatter 的 status
+    stale="$(LC_ALL=C grep -al 'status: "ready"' "${dev}/backlog"/B-*.md 2>/dev/null | wc -l | tr -d ' ')"
+    case "$stale" in ''|*[!0-9]*) stale=0 ;; esac
+    if [ "$stale" -gt 0 ]; then
+        add_part "backlog ${stale} 項待排波"
+    fi
+elif [ -f "${dev}/backlog.md" ]; then
     stale="$(grep -c '| ready |' "${dev}/backlog.md" 2>/dev/null || echo 0)"
     case "$stale" in ''|*[!0-9]*) stale=0 ;; esac
     if [ "$stale" -gt 0 ]; then

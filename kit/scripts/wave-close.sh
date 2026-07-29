@@ -129,16 +129,25 @@ fi
 #
 # 讀工作區檔案而非 HEAD——收尾時剛改完 backlog 還沒 commit 是正常流程，
 # 不該因此被擋（真正要擋的是「根本沒改」）。
-backlog="${dev}/backlog.md"
-if [ -z "$skip_backlog" ] && [ -f "$backlog" ]; then
-    # 同一行同時有 B-NNN 與 ✅ ＝ 該波宣稱完成的工作項
+backlog_dir="${dev}/backlog"
+backlog_md="${dev}/backlog.md"
+if [ -z "$skip_backlog" ]; then
     claimed="$(grep -oE 'B-[0-9]{3}' <(grep '✅' "$dash" 2>/dev/null) 2>/dev/null | sort -u)"
     stale=""
     for bid in $claimed; do
-        # 取該條目在表格區的 status 欄（第 7 欄）
-        line="$(grep -m1 "^| ${bid} |" "$backlog" 2>/dev/null)"
-        [ -n "$line" ] || continue          # backlog 沒這條 → 不是本機制的事
-        st="$(printf '%s' "$line" | awk -F'|' '{gsub(/^ +| +$/,"",$7); print $7}')"
+        if [ -d "$backlog_dir" ]; then
+            # 一筆一檔格式
+            bf="${backlog_dir}/${bid}.md"
+            [ -f "$bf" ] || continue
+            st="$(LC_ALL=C grep -am1 '^status:' "$bf" 2>/dev/null | LC_ALL=C sed 's/^status: *"*//;s/"*$//' || true)"
+        elif [ -f "$backlog_md" ]; then
+            # 舊表格格式
+            line="$(grep -m1 "^| ${bid} |" "$backlog_md" 2>/dev/null)"
+            [ -n "$line" ] || continue
+            st="$(printf '%s' "$line" | awk -F'|' '{gsub(/^ +| +$/,"",$7); print $7}')"
+        else
+            continue
+        fi
         case "$st" in
             ready|ready*) stale="${stale}
   - ${bid}（backlog 仍為 ready，dashboard 已標 ✅）" ;;
