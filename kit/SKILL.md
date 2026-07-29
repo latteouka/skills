@@ -6,11 +6,12 @@ argument-hint: "--intake（安裝）｜不帶參數＝整理收件匣"
 
 # Kit — 工程機制安裝器
 
-> 本檔只是 `/kit-init` 與 `/triage` 兩個指令的入口。kit **package** 另內含七個
+> 本檔只是 `/kit-init` 與 `/triage` 兩個指令的入口。kit **package** 另內含八個
 > 子 skill（各自獨立 symlink 進 `~/.claude/skills/`、各有自己的 SKILL.md）：
 > `wave`（波次引擎）、`grill-me`／`grill-with-docs`／`brainstorm`（訪談）、
-> `debug`、`plans`、`sdd`。判準：自創且屬開發管線成員才進本 package；
-> vendored 上游包（安全／UX 審計）住 repo 頂層由 `vendors.conf` 同步。
+> `debug`、`plans`、`sdd`、`kit-audit`（provenance 稽核）。判準：自創且屬開發
+> 管線成員才進本 package；vendored 上游包（安全／UX 審計）住 repo 頂層由
+> `vendors.conf` 同步。
 
 ## 兩個用途
 
