@@ -45,7 +45,7 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 
 **Phase 2.5 例外：** brainstorming / grill 是本來就需要人的訪談，不算違規停點，但完成後自動回到 Phase 3，不重新等指令。
 
-**合併協助例外：** merge 回 main 時遇到改法矛盾衝突需使用者裁定（見「合併協助」節）——那發生在 wave 完成後的合併階段，且屬破壞性裁定，不受本節限制。
+**合併協助例外：** merge 回 main 時遇到改法矛盾衝突需使用者裁定（見 `references/multi-wave.md`「合併協助」節）——那發生在 wave 完成後的合併階段，且屬破壞性裁定，不受本節限制。
 
 **需人裁定例外：** 執行期遇到需人裁定的事項，按「長跑行為規範」第 5 條非阻塞升級處理——僅當其阻塞所有剩餘工作時才停下。
 
@@ -56,6 +56,10 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 - ledger 記一行「無 {skill}，該步降級」；合約/閘門對應步驟標 `SKIPPED(不可用)`，視同「已執行並記錄」過閘（goal condition (3) 的安全/UX 判定同此認定）
 - 收尾報告以「品質 caveat」區醒目列出所有 SKIPPED 步驟——降級是誠實揭露，不是豁免
 - 訪談類缺席 → 改 inline 訪談（照 Phase 2.5 的聚焦清單逐題問使用者），訪談本身不可跳過——缺的是 skill，不是對齊
+
+## Harness 適配（Codex CLI）
+
+Codex CLI 執行時，**在執行任何 Phase 前**先完整讀取 [references/codex-adaptation.md](references/codex-adaptation.md)。工具名稱需替換；尤其建立 worktree 後必須結束目前 session，從 worktree 目錄重開 Codex。其餘停點、合約與閘門不變。
 
 ## Workflow
 
@@ -255,6 +259,8 @@ git log --oneline -20
    下一次開波時它會與其他回饋一起走 triage，不需要 wave 自己維護一張表。
 4. **零未涵蓋也要寫** — 如果所有決策都有對應工作項，明確寫「本波涵蓋所有 grill/spec 決策」
 
+**進入 Phase 4 前**，若 `/askfable` 可用，先執行 [references/fable-consultation.md](references/fable-consultation.md) 諮詢點 1（獨立檢查漏項、合約覆蓋與排序）；發現缺口先修正再呈現。
+
 ### Phase 4: 向使用者確認範圍
 
 輸出工作清單前先讀 `references/templates.md` 的「Phase 4 工作範圍輸出範本」節，照範本格式問使用者（驗證合約逐項列出、預估規模、Checkpoint 分段、執行方式自動採用結果一併呈現）。
@@ -366,8 +372,8 @@ cd .claude/worktrees/wave-{id}
 
 兩種方式都先確認 goal condition 已寫入 wave-{id}.md「🎯 Goal Condition」區塊（使用者若下 /goal 則同步，沒下也以此區塊為準），再依 Phase 4 自動採用的方式執行：
 
-**選 1 — Subagent-Driven：**
-1. 每一批派工＝三連動作：① 備 brief（分級規則見「Brief-driven 派工」）② 派 implementer（背景、帶 model tier）③ **立即排 ScheduleWakeup fallback**（delay 分層見「心跳 fallback」；環境無此工具才可跳過，且在 ledger 記一行「無 ScheduleWakeup，跳過心跳」）
+**選 1 — Subagent-Driven（第一次派工前先完整讀取 [references/subagent-protocol.md](references/subagent-protocol.md)）：**
+1. 每一批派工＝三連動作：① 備 brief（分級規則見該檔「Brief-driven 派工」）② 派 implementer（背景、帶 model tier）③ **立即排 ScheduleWakeup fallback**（delay 分層見該檔「心跳 fallback」；環境無此工具才可跳過，且在 ledger 記一行「無 ScheduleWakeup，跳過心跳」）
 2. 每個 subagent 完成一項後回報，controller 親自重跑合約 review（不採信報告文字）
 3. 全部完成後跑品質閘門 + 收尾流程
 
@@ -460,33 +466,7 @@ cd .claude/worktrees/wave-{id}
 
 ### Fable 諮詢協議（askfable）
 
-> **CRITICAL: 透過 `/askfable` skill 派 fable-advisor agent 取得獨立第二意見——繞過壞掉的 server-side advisor tool。以下四個諮詢點在判斷成本最高的節點觸發。`/askfable` 不可用（skill 缺席或主 session 已是 Fable）→ 各點跳過，開工時在 ledger 記一行「本波無 Fable 諮詢」。**
-
-**架構差異（vs 舊 advisor）：** fable-advisor 是 fresh agent，看不到主 session transcript——但有 Read/Grep/Bash 工具，可獨立讀檔、跑指令驗證。這是升級不是降級：它給的是**未被主迴圈 framing 污染的獨立意見**。所有脈絡必須組裝進 prompt 或落檔讓 agent 自行 Read。
-
-**四個諮詢點（皆為「人工 review 前」或「判斷已被污染時」，不是「完工後複查」）：**
-
-1. **規劃完成、Phase 4 呈現前**——先把計畫草稿落到 scratch 檔，派 fable-advisor 獨立審查。Prompt 指示 Fable：
-   - 自己跑一輪 Phase 2 四來源掃描指令，列出「我掃到但你清單上沒有」的項（獨立驗證 loop-until-dry）
-   - 抽查合約：預期輸出是否具體、覆蓋場景缺不缺 edge/誤用/守恆
-   - 規模與依賴排序是否合理
-   - **防違規建議 guard**：Fable 意見中違反 Core Principles 的建議（縮範圍、加停點、禁語句型）→ 記 ledger「Fable 建議 X，違反〈禁止端出縮減版〉，不採納」，規模疑慮的合法出口是 Checkpoint 分段
-   - 發現缺口先修再呈給使用者（省一輪人工來回）
-
-2. **換路煞車觸發時**（第 8 條，含蹺蹺板偵測）——Prompt 紀律遵循 askfable 防 anchoring 規則：附「試過什麼＋實際錯誤輸出＋相關檔案路徑」（事實），**不附「我猜根因是 X」**（污染源）。Fresh context 在此反而是升級——不繼承主迴圈的錯誤假設。Fable 指的路優先嘗試。Subagent-Driven 時：implementer 觸發煞車停手回報，**由 controller 諮詢**再 SendMessage 帶結論續跑原 agent。意見衝突時用 SendMessage 追問同一 agent（保脈絡），不重派
-
-3. **大項 design review**（Subagent-Driven 執行期，`task-N-design.md` 落檔後、呈使用者 review 前）——僅 Brief 分級為「大項」（schema 變更、跨系統、多檔）時觸發，一波 0-2 次。Fable 直接 Read `.superpowers/sdd/task-N-design.md`，脈絡組裝成本近零。問：設計與現有 schema/架構的相容性、遷移風險、被否決的替代案是否真該否決、該項合約能否驗到設計宣稱的行為
-
-4. **`/wave batch` 分波結果審查**（分組＋預測交集表呈使用者過目前）——一次 batch 一次呼叫。問：檔案範圍分組有無漏算的相交、依賴順序有無成環或顛倒、「可並行組合」是否高估
-
-**不設收尾終檢諮詢點**：完工後再請一個模型複查交付物屬 over-verification，[官方 Opus 5 指引](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5)明列應移除。交付物真偽由合約實跑輸出與 gate script exit code 認定，不由第二個模型的意見認定。**逐項 commit 前也不諮詢**——N 項 × 30-90 秒，且與 reviewer 親自重跑合約完全重複。
-
-**諮詢紀律：**
-- **呼叫前先 durable**：計畫草稿或 design doc 落檔後才呼叫——askfable 耗時 30-90 秒，session 若中斷，落檔的成果還在；諮詢點 1 因 Phase 4 前尚無 commit，改落 scratch 檔
-- **不默默改道**：Fable 意見與既有證據衝突時，用 SendMessage 對同一 agent 追問（「我查到 X，你建議 Y，哪個約束決勝？」），不悄悄換方向也不悄悄無視
-- **每次諮詢記 ledger 一行**：`[HH:MM] askfable 諮詢點 N：{採納/反駁+理由一句}`
-- askfable 是 Agent tool 呼叫、不是停點——執行期間照常，不違反唯一停點制
-- **缺席降級**：比照「相依 Skill 缺席降級」pattern——ledger 一行、不卡流程
+> **CRITICAL: 四個諮詢點讀 [references/fable-consultation.md](references/fable-consultation.md)（①規劃審查——Phase 4 呈現前必做、②換路煞車、③大項 design review、④batch 分波審查）。`/askfable` 不可用→走缺席降級。**
 
 ### 狀態外部化——Dashboard + Ledger 雙層
 
@@ -514,7 +494,7 @@ cd .claude/worktrees/wave-{id}
 
 ### Subagent-Driven 長跑協議
 
-選 Subagent-Driven 執行方式時讀 [references/subagent-protocol.md](references/subagent-protocol.md) 照做（Brief 第 0 項執行紀律、派工六要素、Brief 分級、模型分層、心跳 fallback、中斷恢復 SendMessage 優先、空跑偵測、Reviewer 不信報告）。
+選 Subagent-Driven 執行方式時讀 [references/subagent-protocol.md](references/subagent-protocol.md) 照做（Brief 第 0 項執行紀律、派工六要素、Brief 分級、模型分層、管線不斷料、心跳 fallback、中斷恢復 SendMessage 優先、Controller 代看門、空跑偵測、Reviewer 不信報告）。
 
 ### 驗證合約執行規則
 
@@ -638,10 +618,7 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
    - **Q3 讀了會改變行為嗎？**（不是「知道就好」的常識）→ 是＝append 到 inbox 標「升級候選: CLAUDE.md」，實際落點由 `/triage` 裁定；否＝丟掉
    - 零條升級時在完成報告明寫「ERRATA N 條，全數判定為一次性，未升級」——沒寫＝沒判定
    - 未裝 intake kit 的專案：改 append 到本波 dashboard 的「未涵蓋決策」區
-5. **直接進入合併協助，不徵詢**（[使用者裁定 2026-07-26]：「照流程本來就該直接做下去」）
-   ——舊版此處「提示使用者可以 merge」是機器防線（收尾鎖／merge re-gate／push 擋門）
-   存在之前的保守預設，防線機器化後只剩摩擦。唯一仍要停的是合併協助步驟 3 的
-   改法矛盾衝突（真需要使用者裁定改法），其餘一路做到 push 完成
+5. **直接進入合併協助，不徵詢**——讀 [references/multi-wave.md](references/multi-wave.md)「合併協助」節照做（**單波也適用**：merge re-gate、UX 補跑回收、worktree 清理）。唯一仍要停的是步驟 3 的改法矛盾衝突（真需要使用者裁定改法），其餘一路做到 push 完成
 6. **merge 後清除本波產物**（`bash <kit>/scripts/wave-close.sh {id}`）——波的 dashboard 與
    ledger 在 merge 之後對未來沒有價值，內容留在 git history 即可。腳本會驗證每個檔都已提交
    且無未提交修改（任一不符即中止），把 `git show` 取回指令寫進 `wave-INDEX.md`，再 `git rm`
@@ -659,6 +636,3 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
 
 多波並行規則（隔離策略、`/wave batch`、`/wave status`、`/wave drop`、合併協助）讀 [references/multi-wave.md](references/multi-wave.md)。收尾流程步驟 5 的合併協助亦在該檔。
 
-## Harness 適配（Codex CLI）
-
-Codex CLI 執行時工具替換表讀 [references/codex-adaptation.md](references/codex-adaptation.md)。所有停點規則、驗證合約、品質閘門、長跑規範一字不變，僅工具呼叫名替換。
