@@ -109,16 +109,21 @@ kit_fm_get() {
 
 # kit_decl_get <file> <key> [default]
 # 讀任意 flat-key YAML 宣告檔（如專案 .claude/kit/kit.yaml）的 top-level key。
-# 與 kit_config_get 同一套解析（行內註解、引號值），差別只在檔案路徑參數化——
-# kit_config_get 綁 intake.config.yaml（intake 模組私有），本函式供跨模組宣告檔用。
-# fail-open：缺檔／缺 key／空值一律回 default。
+# 與 kit_config_get 同一套 value 解析（行內註解、引號值），差別在檔案路徑
+# 參數化——kit_config_get 綁 intake.config.yaml（intake 模組私有），本函式供
+# 跨模組宣告檔用。
+# 兩態語意（declaration-formats「欄位留空＝該功能降級」的實作面）：
+#   - key 存在但值為空（`key: ""` 或 `key:` 後無值）→ 回空字串——宣告者
+#     主動留空＝降級，不得被 default 蓋掉（GPT-5 總檢：舊版把兩態都轉
+#     default，空 matrix_dir 仍變回預設路徑，降級語意失效）。
+#   - key 完全缺席／檔案缺失 → 回 default（fail-open）。
+# TS 側同構實作：engines/rtm-check.ts declGet，語意改動必兩側同改。
 kit_decl_get() {
-    local file="$1" key="$2" default="${3:-}" raw val
+    local file="$1" key="$2" default="${3:-}" raw
     [ -f "$file" ] || { printf '%s' "$default"; return 0; }
+    grep -q "^${key}:" "$file" 2>/dev/null || { printf '%s' "$default"; return 0; }
     raw="$(sed -n "s/^${key}:[[:space:]]*//p" "$file" | sed -n '1p')"
-    val="$(_kit_unquote_value "$raw")"
-    [ -n "$val" ] || val="$default"
-    printf '%s' "$val"
+    _kit_unquote_value "$raw"
 }
 
 # kit_manifest_lookup <manifest> <kit_path>

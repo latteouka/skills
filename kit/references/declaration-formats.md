@@ -98,15 +98,18 @@ pathspec-liveness 掃描對象清單，每行一個 hook 檔路徑（repo-root �
 
 ## manifest（kit 側，非專案宣告）
 
-`kit/manifest/provenance.tsv`——closed ledger，8 欄 TSV：
+`kit/manifest/provenance.tsv`——closed ledger，9 欄 TSV：
 
 ```
-kit_path  upstream  upstream_commit  upstream_sha256  kit_sha256  absorbed  mode  notes
+kit_path  upstream  upstream_commit  upstream_sha256  kit_sha256  absorbed  mode  upstream_status  notes
 ```
 
-- **空欄一律 `-` 佔位，永不留空**（防 NF≠8）；hash 格式 `sha256:<hex>`，`-` = 跳過該側比對
+- **空欄一律 `-` 佔位，永不留空**（防 NF≠9）；hash 格式 `sha256:<64hex>`，`-` = 跳過該側比對
 - `upstream`：`<專案>:<路徑>`（如 `dfaa:scripts/hooks/ratchet.sh`）；kit 自創記 `kit:original`；多源抽取記 `<專案>:(多源)` 並以 `-` hash 跳過解析
-- `mode` 三值：`verbatim`（逐位元組或僅路徑定位改動）｜`parameterized`（邏輯同構、參數抽宣告）｜`extracted-pattern`（抽模式不抽內容——上游漂移只提醒人工比對，不做 hash 判定）
-- `kit_path` 可帶 `#anchor` 段落錨（K1 為檔級粒度保留位：存在性檢查剝 fragment、hash 比對跳過）
+- **來源驗證走歷史 blob（K5.5）**：`upstream_sha256` 對的是上游 repo 中 `git show <upstream_commit>:<path>` 的 blob hash——來源真偽與上游 live 狀態脫鉤，上游後續演化或換 shim（K6）不影響來源驗證；`upstream_commit=-` 跳過來源驗證
+- `mode` 三值：`verbatim`（逐位元組或僅路徑定位改動）｜`parameterized`（邏輯同構、參數抽宣告）｜`extracted-pattern`（抽模式不抽內容——上游演化只提醒人工比對，不做 hash 判定）
+- `upstream_status` enum：`active`（上游仍是活源——audit 額外比對 live 檔，差異報「live 前進」獨立分類）｜`retired`（上游已退役/換 shim——跳過 live 比對）｜`successor`（kit 版已是正宗，上游反向依賴）｜`-`（`kit:original` 行固定填 `-`）
+- **欄位驗證 fail-closed**（`tools/kit-audit.sh` 前置，違規 exit 2）：mode／upstream_status 非法 enum、absorbed 非 `YYYY-MM-DD` 或晚於今日、hash 欄非 `sha256:<64hex>` 且非 `-`、kit_path 重複
+- `kit_path` 可帶 `#anchor` 段落錨（K1 為檔級粒度保留位：存在性檢查剝 fragment、hash 比對跳過——`kit-audit.sh` 與 `tests/cases/manifest.sh` 同契約，anchor 列不進 hash 驗證分母）
 - **無帳掃描範圍**：`engines/ gates/ tools/ hooks/ scripts/ lib/ installers/` 遞迴 `*.sh` 與 `*.ts`——目錄下存在但未列帳 = FAIL（與 `tests/cases/manifest.sh` 同步，改一邊必改另一邊）。templates/ 與 references/ 混有非機制檔，帳可選、掃描不強制
 - 消費者：`tools/kit-audit.sh`（三態判定）＋ `tests/cases/manifest.sh`（迴歸對帳，K2-K7 改檔忘記帳立即紅燈）

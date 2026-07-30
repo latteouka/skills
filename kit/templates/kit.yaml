@@ -3,7 +3,8 @@
 #
 # flat-key YAML：只支援 `key: "value"` 平鋪格式（bash 側 kit_decl_get／TS 側
 # declGet 皆為 grep 式解析，不支援巢狀、不引入 yq）。
-# 欄位留空 ＝ 該功能降級（消費端引擎必須在輸出明示降級，不靜默）。
+# 欄位留空（`key: ""`）＝該功能降級——kit_decl_get 回空字串，不吃引擎預設值
+# （消費端引擎必須在輸出明示降級，不靜默）；整行刪除＝引擎用內建預設值。
 #
 # 與 intake.config.yaml 的關係：intake.config.yaml 維持原位原格式（intake 模組
 # 私有）；本檔是跨模組宣告，兩檔長期不合併。
@@ -32,7 +33,8 @@ merge_prep_cmd: ""
 tool_readiness: ""
 # merge-train 六支＋wave-gate 統一消費的基底分支
 base_branch: "main"
-# closure-lock-guard docs 豁免 glob（`|` 分隔；留空＝預設 *.md|.claude/dev/*）
+# closure-lock-guard docs 豁免 glob（`|` 分隔）；留空＝無豁免（降級）；
+# 刪除本行＝引擎預設 *.md|.claude/dev/*
 lock_docs_exempt: ""
 
 # --- rtm（需求追溯矩陣；引擎 kit/engines/rtm-check.ts——專案須自備 js-yaml）---
@@ -50,7 +52,7 @@ reqsync_anchors: ""
 reqsync_excludes: ""
 # check7 免驗 token（形似路徑的非路徑字串）
 rtm_nonpath_tokens: "Next.js Node.js"
-# 進階必填規則（留空／不宣告＝用引擎預設；見 engines/rtm-check.ts 頭註）：
+# 進階必填規則（不宣告＝用引擎預設；留空＝該規則停用；見 engines/rtm-check.ts 頭註）：
 # rtm_notes_required: "divergent"
 # rtm_detail_specs_required: "implemented partial divergent"
 # rtm_impl_details_required: "implemented partial"
