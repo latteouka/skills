@@ -114,4 +114,20 @@ assert_contains "$PL_OUT6" "0 條" "⑥訊息含零條指示"
 assert_contains "$PL_OUT6" "inspected:0" "⑦全域計數印 inspected:0"
 assert_eq "1" "$PL_RC6" "⑦inspected:0 時 exit 必 ≠0"
 
+# --- ⑧ strict/lax 分流（K6 Step B parity 實踩修）：目錄展開檔無 pathspec＝上游
+#     「掃目錄靜默跳過」語意，不得 FAIL；conf 明示檔案（⑥）維持 strict 紅。
+mkdir -p "$PL_REPO/dirhooks"
+cat > "$PL_REPO/dirhooks/with-spec.sh" <<'EOG'
+changed="$(git diff --name-only HEAD -- 'src')"
+EOG
+cat > "$PL_REPO/dirhooks/no-spec.sh" <<'EOG'
+echo "pure helper, no pathspec here"
+EOG
+printf 'dirhooks\n' > "$PL_CONF"
+PL_OUT8="$(bash "$PL_ENGINE" --repo-root "$PL_REPO" --decl-dir "$PL_DECL" 2>&1)"
+PL_RC8=$?
+assert_eq "0" "$PL_RC8" "⑧目錄展開含零 pathspec 檔 → lax 豁免 exit 0"
+assert_not_contains "$PL_OUT8" "no-spec.sh" "⑧零 pathspec 檔未被點名 FAIL"
+assert_contains "$PL_OUT8" "inspected:1" "⑧有 pathspec 的檔照常計數"
+
 rm -rf "$PL_REPO"

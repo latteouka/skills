@@ -324,7 +324,7 @@ while IFS= read -r conf_line || [ -n "${conf_line}" ]; do
       [ "$(basename "${f}")" = "pathspec-liveness.sh" ] && continue
       dir_found=1
       rel="${f#"${PROJECT_ROOT}"/}"
-      TARGET_LIST="${TARGET_LIST}script"$'\t'"${rel}"$'\n'
+      TARGET_LIST="${TARGET_LIST}script"$'\t'"${rel}"$'\t'"lax"$'\n'
       target_count=$((target_count + 1))
     done
     if [ "${dir_found}" -eq 0 ]; then
@@ -336,7 +336,7 @@ while IFS= read -r conf_line || [ -n "${conf_line}" ]; do
       *.sh) target_form="script" ;;
       *)    target_form="hook" ;;
     esac
-    TARGET_LIST="${TARGET_LIST}${target_form}"$'\t'"${entry}"$'\n'
+    TARGET_LIST="${TARGET_LIST}${target_form}"$'\t'"${entry}"$'\t'"strict"$'\n'
     target_count=$((target_count + 1))
   else
     echo "pathspec-liveness: conf:${conf_lineno} 列的路徑不存在 [${entry}]（展開為 ${abs_entry}），fail-closed，拒絕通過" >&2
@@ -355,7 +355,7 @@ grand_total=0
 fail_count=0
 fail_report=""
 
-while IFS=$'\t' read -r target_form target_rel || [ -n "${target_form}" ]; do
+while IFS=$'\t' read -r target_form target_rel target_strict || [ -n "${target_form}" ]; do
   [ -z "${target_form}" ] && continue
   hook_file="${PROJECT_ROOT}/${target_rel}"
   # 目標層計數器（GPT-5 總檢 §4.4 裁定）：目標存在但解析出 0 條 pathspec 是假
@@ -482,7 +482,10 @@ while IFS=$'\t' read -r target_form target_rel || [ -n "${target_form}" ]; do
   # 目標層 0 條判定（GPT-5 總檢 §4.4 裁定）：這個目標從頭到尾一條 pathspec
   # 都沒解析出來，是假 0（跟「解析成功、只是巧合 0 個 git diff 呼叫」在使用者
   # 眼中無法區分）——一律當成 FAIL，訊息點名來源檔與零條指示，不靜默放行。
-  if [ "${target_pathspec_count}" -eq 0 ]; then
+  # lax（目錄展開檔）豁免：上游語意是「掃目錄、無 pathspec 的 hook 靜默跳過」
+  # ——每支 hook 都有 pathspec 不是宣告者的承諾；strict（conf 明示檔案）才是。
+  # 目錄整體死 glob 已在展開處 fail-closed；全域 inspected:0 兜底不變量仍在。
+  if [ "${target_pathspec_count}" -eq 0 ] && [ "${target_strict:-strict}" = "strict" ]; then
     echo "pathspec-liveness: [${target_rel}] 解析出 0 條 pathspec（宣告目標存在但無可驗證內容，防假 0），FAIL" >&2
     fail_count=$((fail_count + 1))
     fail_report="${fail_report}${target_rel}"$'\t'"(none)"$'\t'"解析出 0 條 pathspec"$'\n'
