@@ -18,7 +18,8 @@ tighten_branch: "main"
 app_workspace: "apps/web"                  # Tier B 指令 cwd；無 monorepo 留空
 merge_prep_cmd: "pnpm install --frozen-lockfile && pnpm prisma generate"
 tool_readiness: "eslint tsc vitest"
-regate_branch: "main"
+base_branch: "main"                        # merge-train 六支+wave-gate 統一消費（K2 裁定，取代早稿 regate_branch）
+lock_docs_exempt: ""                       # closure-lock-guard docs 豁免 glob（| 分隔；空=預設 *.md|.claude/dev/*）
 
 # --- rtm
 matrix_dir: "docs/rtm/matrix"
@@ -51,12 +52,19 @@ wave-gate 的 tier gate stub，`gates.d/tierA.d/NN-*.sh`（快篩）與 `gates.d
 
 - `NN-` 前綴決定字典序執行順位（dfaa A1..A5/B1..B5 直譯 10-…50-）
 - 每檔可執行，cwd＝repo 根；環境變數：`PROJECT_ROOT`、`APP_WORKSPACE`、`GATE_PHASE`（收尾|baseline）、`TIER_B_ALREADY_RED`（tier 內已有紅燈旗標）
-- **exit code 唯一介面**；stdout 前綴 `inspected:N` 選填（canary 消費）
+- **exit code 唯一介面**；stdout 前綴 `inspected:N`——**有 canary.d fixture 的 gate 必填**（三斷言之 3），無 fixture 的 gate 選填
 - 條件觸發（如僅 source 變更時跑）寫在 stub 內自行 `exit 0` ＋印 `SKIP(原因)`；紅燈早退、baseline 不早退、re-gate 戳記、鎖——全在引擎骨架，stub 無感
 
 ## canary.d/
 
-gate 自測 fixture，`canary.d/<gate>/violation/` 與 `canary.d/<gate>/clean/` 雙目錄。canary 引擎對每支 gate 餵雙 fixture：violation 必紅、clean 必綠、`inspected:N` N>0——三斷言缺一即 canary FAIL（防「gate 跑了 exit 0 但檢查 0 個檔」）。
+gate 自測 fixture。`canary.d/<gate>/` 契約：
+
+- `run.sh` 必要——引擎把 fixture 樹複製進 scratch 後以 scratch 為 cwd 執行；exit code = gate 結果；stdout 須含 `inspected:N`
+- `violation/` 與 `clean/` 必要——違規／語意相近但合法的 fixture 樹（`*.fixture` 副檔名遮蔽自動還原——防 violation fixture 被它要測的 gate 在 commit 時攔下）
+- `git` 選配 marker 檔——存在＝引擎先建 scratch git repo + seed 字面名 origin/main 分支再複製 fixture
+- `setup.sh` 選配——git 拓撲建構（scratch 內、fixture 複製後、run.sh 前執行）
+
+引擎（`engines/canary.sh`）逐 gate 三斷言：violation 必紅、clean 必綠、`inspected:N` N>0——缺一即 FAIL（防「gate 跑了 exit 0 但檢查 0 個檔」）；canary.d 缺失或零 gate = exit 2 fail-closed。
 
 ## health.d/
 
