@@ -7,11 +7,13 @@
 主宣告檔，flat-key YAML（與 intake.config.yaml 同慣例，`kit_decl_get` grep-based 解析，不引入 yq）。欄位留空 = 該功能降級（引擎輸出必須明示降級）。
 
 ```yaml
+contract_version: "1"                      # 宣告格式版本（版本協商節；引擎支援集合 {1}）
+kit_pin: ""                                # kit commit pin：空=滾動；非空=kit-doctor 驗 HEAD 一致
 kit_root: "/Users/x/projects/skills/kit"   # 安裝時寫死絕對路徑
 modules: "intake backlog rtm wave-gates ratchet"   # 已安裝模組（空白分隔）
 
 # --- ratchet
-baseline_file: "quality-baseline.json"     # repo-root 相對；引擎以 BASELINE_FILE 原名提供給 counter
+baseline_file: "quality-baseline.json"     # repo-root 相對；引擎以 BASELINE_FILE 原名提供給 counter【必要欄位】
 slow_counters: ""                          # 空白分隔；compare 模式跳過（RATCHET_FULL=1 強制跑）。dfaa 遷移必填 "eslint-warnings"
 
 # --- wave-gate
@@ -22,7 +24,7 @@ base_branch: "main"                        # merge-train 六支+wave-gate 統一
 # lock_docs_exempt: "*.md|.claude/dev/*"   # closure-lock-guard docs 豁免 glob（| 分隔）；缺鍵=引擎預設、宣告空值=關閉豁免——預設不寫入
 
 # --- rtm
-matrix_dir: "docs/rtm/matrix"
+matrix_dir: "docs/rtm/matrix"                             # 【必要欄位】
 status_enum: "implemented partial divergent planned na"   # PASS 統計行欄序＝宣告序
 impl_path_bases: ". apps/web apps/web/src"                # check7 suffix-match 基準
 rtm_nonpath_tokens: "Next.js Node.js"                     # impl_details 非路徑 token 白名單（dfaa 遷移補 sigma.js 等）
@@ -34,6 +36,17 @@ reqsync_excludes: "__tests__ migrations"                  # 路徑段名比對
 ```
 
 與 `intake.config.yaml` 的關係：intake.config.yaml 維持原位原格式（intake 模組私有）；kit.yaml 是跨模組宣告。`--rtm` 安裝時把 `matrix_dir` 回填 intake.config.yaml 的 `spec_layer`、rtm-check 指令回填 `spec_check`，接通 /triage 對帳線。兩檔長期不合併。
+
+### 版本協商（contract_version＋kit_pin，K5.5 GPT §1.1／§5.2）
+
+kit 引擎與消費者宣告之間原本沒有版本協商——中央 kit 一更新，所有消費者行為立即改變，且無法重現某個消費者 commit 當時的品質系統。兩個 key＋一支健檢工具補上這層：
+
+- **`contract_version`**：宣告格式版本，引擎目前支援集合 `{1}`。缺席、空值或不在支援集合 → `tools/kit-doctor.sh` FAIL。本波只做 doctor 檢查層，引擎不讀此值自炸（版本強制留 K6+）。
+- **`kit_pin`**：kit repo 的 commit hash（短/長皆可）。空值或缺鍵＝不 pin（滾動跟隨 kit HEAD，doctor 明示不攔）；非空＝doctor 以 `git -C <kit_root> rev-parse HEAD` 取當前 kit HEAD 做**字串前綴比對**（宣告值絕不進 git 解析——防 revision 表達式注入），不一致預設 WARN。
+- **`--strict-pin`（K6 凍結期用法）**：K6 凍結期跑 `kit-doctor.sh --strict-pin`，pin 不符從 WARN 升為 FAIL——凍結期消費者必須釘死在驗收過的 kit commit，漂移即紅燈。宣告了 pin 但 kit root 非 git repo（驗不了）一律 FAIL：不可驗證不得當通過。
+- **必要欄位（doctor 檢查最小集）**：依 `modules` 宣告判定——`ratchet` 消費者的 `baseline_file`、`rtm` 消費者的 `matrix_dir`（上方範例標【必要欄位】者）。key 存在但空值（宣告降級）→ FAIL 指名；缺鍵＝引擎預設 → 不攔（`kit_decl_get` 兩態語意）。`lock_docs_exempt` 等「預設不寫入」的 key 不在必要集。
+
+消費者健檢：`bash <kit>/tools/kit-doctor.sh [--decl-dir <path>] [--strict-pin]`——檢查項各自獨立報告行、fail-closed 匯總（任一 FAIL → exit 1），尾行 `inspected:N`（實檢 0 項 → exit 2，防假 0）。除上述外亦驗：恆綠 example gate（gates.d stub 與 `kit/templates/gates.d/` 模板字面相同＝未客製 → FAIL 列名）、canary.d 存在且 ≥1 fixture、gates.d↔canary.d 對帳（重用 `lib/canary-harness.sh` 的 `canary_reconcile_gates`，與 engines/canary.sh 同邏輯）。
 
 ## counters.d/
 

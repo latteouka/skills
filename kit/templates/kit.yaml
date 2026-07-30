@@ -9,6 +9,15 @@
 # 與 intake.config.yaml 的關係：intake.config.yaml 維持原位原格式（intake 模組
 # 私有）；本檔是跨模組宣告，兩檔長期不合併。
 
+# --- 版本協商（consumer contract；tools/kit-doctor.sh 消費）------------------
+
+# 宣告格式版本（引擎支援集合 {1}；缺席或不支援 → kit-doctor FAIL）
+contract_version: "1"
+# kit repo commit pin（短/長 hash）：空值＝不 pin（滾動跟隨 kit HEAD）；
+# 非空＝kit-doctor 驗當前 kit HEAD 一致，不符預設 WARN、--strict-pin 下
+# FAIL（K6 凍結期用法）
+kit_pin: ""
+
 # 安裝時由 kit-init 寫死 kit 絕對路徑（資訊用；引擎皆自行定位，不消費此值）
 kit_root: ""
 
