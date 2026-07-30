@@ -1,8 +1,11 @@
-# pathspec-liveness.sh — engines/pathspec-liveness.sh 合約五場景＋目錄行補測
+# pathspec-liveness.sh — engines/pathspec-liveness.sh 合約五場景＋目錄行補測＋
+# 假 0 兜底（GPT-5 總檢 §4.4）
 #
 # ①恆 0 命中必紅＋點名該檔 ②全命中綠＋inspected:N 精確值 ③conf 缺失 fail-closed
 # ④cd 母題重現（cd sub 後 root-relative pathspec 必紅；:(top) 錨定對照必綠）
 # ⑤conf 列的檔不存在 fail-closed。補測：目錄行＝掃全部 *.sh（script 形態解析器）。
+# ⑥宣告目標存在但解析出 0 條 pathspec → FAIL＋點名來源檔與零條指示（mutation 紅
+# case）⑦兜底不變量：inspected:0 與 exit 0 不並存（同場景驗證全域計數）。
 
 PL_ENGINE="$KIT_ROOT/engines/pathspec-liveness.sh"
 
@@ -93,5 +96,22 @@ PL_OUT5="$(bash "$PL_ENGINE" --repo-root "$PL_REPO" --decl-dir "$PL_DECL" 2>&1)"
 PL_RC5=$?
 assert_eq "1" "$PL_RC5" "⑤目標檔不存在 exit 1（fail-closed）"
 assert_contains "$PL_OUT5" "不存在" "⑤訊息點名不存在"
+
+# --- ⑥ 宣告目標存在、但檔內完全沒有 git diff pathspec 呼叫 → 解析出 0 條
+# （GPT-5 總檢 §4.4 裁定：舊行為印 inspected:0 後仍 exit 0，是假 0；現在必須
+# FAIL，訊息點名來源檔＋零條指示）
+cat > "$PL_REPO/hooks/no-pathspec-hook" <<'EOF'
+echo "this hook never calls git diff -- there is nothing to inspect here"
+EOF
+printf 'hooks/no-pathspec-hook\n' > "$PL_CONF"
+PL_OUT6="$(bash "$PL_ENGINE" --repo-root "$PL_REPO" --decl-dir "$PL_DECL" 2>&1)"
+PL_RC6=$?
+assert_eq "1" "$PL_RC6" "⑥解析 0 條 pathspec exit 1"
+assert_contains "$PL_OUT6" "hooks/no-pathspec-hook" "⑥訊息點名來源檔"
+assert_contains "$PL_OUT6" "0 條" "⑥訊息含零條指示"
+
+# --- ⑦ 兜底不變量：inspected:0 與 exit 0 不得並存（同一場景，驗全域計數面）
+assert_contains "$PL_OUT6" "inspected:0" "⑦全域計數印 inspected:0"
+assert_eq "1" "$PL_RC6" "⑦inspected:0 時 exit 必 ≠0"
 
 rm -rf "$PL_REPO"

@@ -272,6 +272,7 @@ inspect_pathspec() {
   local source_name="${1}" t_lineno="${2}" pathspec="${3}" token_abs_dir="${4}"
   local ls_out ls_rc hits cwd_rel reason
   grand_total=$((grand_total + 1))
+  target_pathspec_count=$((target_pathspec_count + 1))
   ls_out="$(cd "${token_abs_dir}" && git ls-files -- "${pathspec}" 2>&1)"; ls_rc=$?
   [ "${ls_rc}" -eq 0 ] || return 2
   if [ -z "${ls_out}" ]; then hits=0; else hits="$(printf '%s\n' "${ls_out}" | wc -l | tr -d ' ')"; fi
@@ -357,6 +358,9 @@ fail_report=""
 while IFS=$'\t' read -r target_form target_rel || [ -n "${target_form}" ]; do
   [ -z "${target_form}" ] && continue
   hook_file="${PROJECT_ROOT}/${target_rel}"
+  # 目標層計數器（GPT-5 總檢 §4.4 裁定）：目標存在但解析出 0 條 pathspec 是假
+  # 0——不能靜默通過。每個目標獨立歸零、獨立判定。
+  target_pathspec_count=0
 
   if [ "${target_form}" = "hook" ]; then
 
@@ -398,6 +402,7 @@ while IFS=$'\t' read -r target_form target_rel || [ -n "${target_form}" ]; do
         pathspec="${rest#*:}"
 
         grand_total=$((grand_total + 1))
+        target_pathspec_count=$((target_pathspec_count + 1))
 
         # 明確驗 git ls-files 自己的 exit code（不只信輸出行數）——ERRATA 鐵則
         # 2：計數拿到 0 前先驗 exit code，否則 git 本身出錯（例如 magic 語法
@@ -445,35 +450,57 @@ while IFS=$'\t' read -r target_form target_rel || [ -n "${target_form}" ]; do
   parse_out="$(parse_script_hook_file "${hook_file}")"
   parse_rc=$?
   [ "${parse_rc}" -eq 0 ] || { echo "pathspec-liveness: 解析 [${source_name}] 失敗" >&2; exit 1; }
-  [ -z "${parse_out}" ] && continue
-  echo "--- ${source_name} ---"
-  while IFS= read -r ev || [ -n "${ev}" ]; do
-    case "${ev}" in
-      ROOT_TOKEN:*)
-        rest="${ev#ROOT_TOKEN:}"
-        t_lineno="${rest%%:*}"
-        pathspec="${rest#*:}"
-        inspect_pathspec "${source_name}" "${t_lineno}" "${pathspec}" "${PROJECT_ROOT}" || exit 1
-        ;;
-      SUB_TOKEN:*)
-        rest="${ev#SUB_TOKEN:}"
-        t_lineno="${rest%%:*}"
-        rest="${rest#*:}"
-        subdir="${rest%%:*}"
-        pathspec="${rest#*:}"
-        token_abs_dir="$(cd "${PROJECT_ROOT}/${subdir}" 2>/dev/null && pwd)"
-        [ -n "${token_abs_dir}" ] || exit 1
-        inspect_pathspec "${source_name}" "${t_lineno}" "${pathspec}" "${token_abs_dir}" || exit 1
-        ;;
-      *) echo "pathspec-liveness: [${source_name}] 未知事件 [${ev}]" >&2; exit 1 ;;
-    esac
-  done <<< "${parse_out}"
+  # 注意：不對空 parse_out 提前 continue——目標存在但解析出 0 條 pathspec
+  # 本身就是待判定的情況（見下方目標層 0 條檢查），不能靜默略過整個目標。
+  if [ -n "${parse_out}" ]; then
+    echo "--- ${source_name} ---"
+    while IFS= read -r ev || [ -n "${ev}" ]; do
+      case "${ev}" in
+        ROOT_TOKEN:*)
+          rest="${ev#ROOT_TOKEN:}"
+          t_lineno="${rest%%:*}"
+          pathspec="${rest#*:}"
+          inspect_pathspec "${source_name}" "${t_lineno}" "${pathspec}" "${PROJECT_ROOT}" || exit 1
+          ;;
+        SUB_TOKEN:*)
+          rest="${ev#SUB_TOKEN:}"
+          t_lineno="${rest%%:*}"
+          rest="${rest#*:}"
+          subdir="${rest%%:*}"
+          pathspec="${rest#*:}"
+          token_abs_dir="$(cd "${PROJECT_ROOT}/${subdir}" 2>/dev/null && pwd)"
+          [ -n "${token_abs_dir}" ] || exit 1
+          inspect_pathspec "${source_name}" "${t_lineno}" "${pathspec}" "${token_abs_dir}" || exit 1
+          ;;
+        *) echo "pathspec-liveness: [${source_name}] 未知事件 [${ev}]" >&2; exit 1 ;;
+      esac
+    done <<< "${parse_out}"
+  fi
 
+  fi
+
+  # 目標層 0 條判定（GPT-5 總檢 §4.4 裁定）：這個目標從頭到尾一條 pathspec
+  # 都沒解析出來，是假 0（跟「解析成功、只是巧合 0 個 git diff 呼叫」在使用者
+  # 眼中無法區分）——一律當成 FAIL，訊息點名來源檔與零條指示，不靜默放行。
+  if [ "${target_pathspec_count}" -eq 0 ]; then
+    echo "pathspec-liveness: [${target_rel}] 解析出 0 條 pathspec（宣告目標存在但無可驗證內容，防假 0），FAIL" >&2
+    fail_count=$((fail_count + 1))
+    fail_report="${fail_report}${target_rel}"$'\t'"(none)"$'\t'"解析出 0 條 pathspec"$'\n'
   fi
 done <<< "${TARGET_LIST}"
 
 echo ""
 echo "inspected:${grand_total}"
+
+# 兜底不變量（GPT-5 總檢 §4.4 裁定）：inspected:0 與 exit 0 絕不並存。上面的
+# 目標層 0 條檢查應已在 grand_total 有機會歸零前攔下所有已知路徑，但這條
+# 檢查獨立存在、不依賴上面的邏輯——未來若解析協定改版漏掉某個路徑，這裡仍
+# 會 fail-closed，不讓「跑了但什麼都沒檢查到」偽裝成綠燈。
+if [ "${grand_total}" -eq 0 ]; then
+  echo "pathspec-liveness: inspected:0（本輪未實際檢查任何 pathspec），fail-closed，拒絕通過" >&2
+  exit 1
+fi
+
 if [ "${fail_count}" -gt 0 ]; then
   echo "pathspec-liveness: FAIL -- ${fail_count} 條 pathspec 恆 0 命中：" >&2
   printf '%s' "${fail_report}" | while IFS=$'\t' read -r loc spec detail; do
