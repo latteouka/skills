@@ -65,9 +65,11 @@ Subagent-Driven（既定）／ Inline＋一句具體理由（記入 dashboard Me
 （貼 Phase 5 輸出 3 全文 (1)-(7)；收尾時逐條打勾）
 
 ## 🤖 工作項
-| # | 功能 | 狀態 | 合約指令 | 合約結果 | commit |
-|---|------|------|---------|---------|--------|
-| 1 | ... | ⏳ 待做 | `pnpm vitest run ...` | （貼輸出） | — |
+| # | 功能 | 狀態 | matrix | 合約指令 | 合約結果 | commit |
+|---|------|------|--------|---------|---------|--------|
+| 1 | ... | ⏳ 待做 | 101-xxx/3 | `pnpm vitest run ...` | （貼輸出） | — |
+
+**matrix 欄**：有 RTM 的專案（`intake.config.yaml` 的 `spec_layer` 非空）**必填**——填對應 matrix 條目 ref（`<檔名去 .yaml>/<req_id 末段>`，如 `101-案件與證物管理/3`；一項多條目以逗號並列），確無對應條目時填 `none(理由)`（如 `none(純重構不動行為)`），不得留空。無 RTM 專案整欄省略。條目 ref 寫進工作項段落即隨 sdd task-brief 全文抽取自動傳給 implementer（task-brief 零改動，裁定見 kit/references/rtm-authoring.md 附註）。
 
 ### 🤖-1 驗證合約
 （從 Phase 3 複製完整合約，含 happy/edge/誤用場景）
