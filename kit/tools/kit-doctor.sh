@@ -109,11 +109,19 @@ else
         _fail "kit_pin 已宣告 [${PIN}] 但 kit root 非 git repo，無法驗證——不可驗證不得當通過 [${KIT_ROOT_TARGET}]"
     else
         PIN_MATCH=0
+        PIN_VALID=1
         case "${PIN}" in
-            *[!0-9a-f]*|"") PIN_MATCH=0 ;;   # 非 hex ≠ 任何 hash（且不進 git 解析）
-            *) case "${KIT_HEAD}" in "${PIN}"*) PIN_MATCH=1 ;; esac ;;
+            *[!0-9a-f]*|"") PIN_VALID=0 ;;   # 非 hex ≠ 任何 hash（且不進 git 解析）
+            *) [ "${#PIN}" -ge 7 ] || PIN_VALID=0 ;;   # 前綴比對需最小長度，防 1 字元 pin 矇中
         esac
-        if [ "${PIN_MATCH}" -eq 1 ]; then
+        if [ "${PIN_VALID}" -eq 1 ]; then
+            case "${KIT_HEAD}" in "${PIN}"*) PIN_MATCH=1 ;; esac
+        else
+            _fail "kit_pin 無效：[${PIN}]——須為 ≥7 位小寫 hex（git abbrev 慣例）；無效 pin 視同宣告了但驗不了"
+        fi
+        if [ "${PIN_VALID}" -eq 0 ]; then
+            :   # 已 FAIL，不再進 match 分流
+        elif [ "${PIN_MATCH}" -eq 1 ]; then
             _ok "kit_pin: ${PIN}＝當前 kit HEAD（${KIT_HEAD}）"
         elif [ "${STRICT_PIN}" -eq 1 ]; then
             _fail "kit_pin 不符（--strict-pin）：宣告 [${PIN}]，當前 kit HEAD [${KIT_HEAD}]——凍結期不得漂移"
@@ -139,13 +147,20 @@ else
                 continue
             fi
             stub_is_template=0
+            n_tpl_compared=0
             for tpl in "${TPL_D}/${tier}.d"/*.sh; do
                 [ -f "${tpl}" ] || continue
+                n_tpl_compared=$((n_tpl_compared + 1))
                 if cmp -s "${stub}" "${tpl}"; then
                     stub_is_template=1
                     break
                 fi
             done
+            # 零模板檔＝比對迴圈空轉，「已客製」無依據——視同模板目錄缺失（防靜默通過）
+            if [ "${n_tpl_compared}" -eq 0 ] && [ "${stub_is_template}" -eq 0 ]; then
+                _fail "恆綠 example gate 無法驗證：模板目錄零 *.sh [${TPL_D}/${tier}.d]（kit 安裝不完整）"
+                continue
+            fi
             if [ "${stub_is_template}" -eq 1 ]; then
                 _fail "恆綠 example gate 未客製：${tier}.d/$(basename "${stub}") 與 kit 模板字面相同——範例 stub 恆綠，等於沒有 gate"
             else

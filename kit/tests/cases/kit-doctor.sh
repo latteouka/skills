@@ -142,4 +142,22 @@ KD7G_OUT="$(_kd_run "$KD7" --strict-pin)"
 assert_eq "0" "$?" "pin 相符（短 hash）--strict-pin exit 0"
 assert_contains "$KD7G_OUT" "當前 kit HEAD" "pin 相符明示比對結果"
 
+# --- K5.5 sharp-edges 修：pin 最小長度（<7 hex＝無效宣告 FAIL，防 1 字元前綴矇中）
+KD_HEAD_C1="$(printf '%s' "${KD_HEAD_SHORT}" | cut -c1)"
+sed "s/^kit_pin: \".*\"/kit_pin: \"${KD_HEAD_C1}\"/" "$KD7/kit.yaml" > "$KD7/kit.yaml.tmp"
+mv "$KD7/kit.yaml.tmp" "$KD7/kit.yaml"
+KD8_OUT="$(_kd_run "$KD7")"
+KD8_RC=$?
+assert_eq "1" "$KD8_RC" "1 字元 pin（即使是 HEAD 首字）＝無效宣告 exit 1"
+assert_contains "$KD8_OUT" "kit_pin 無效" "短 pin 訊息指名無效"
+
+# --- K5.5 sharp-edges 修：tier 模板目錄零 *.sh＝無法驗證 FAIL（防比對空轉靜默通過）
+sed "s/^kit_pin: \".*\"/kit_pin: \"\"/" "$KD7/kit.yaml" > "$KD7/kit.yaml.tmp"
+mv "$KD7/kit.yaml.tmp" "$KD7/kit.yaml"
+rm -f "$KD_KIT/templates/gates.d/tierA.d"/*.sh
+KD9_OUT="$(_kd_run "$KD7")"
+KD9_RC=$?
+assert_eq "1" "$KD9_RC" "模板目錄零 *.sh → exit 1（不得靜默報已客製）"
+assert_contains "$KD9_OUT" "模板目錄零 *.sh" "零模板訊息指名"
+
 rm -rf "$KD_KIT" "$KD1" "$KD2" "$KD3" "$KD4" "$KD5" "$KD6" "$KD6C" "$KD7"
