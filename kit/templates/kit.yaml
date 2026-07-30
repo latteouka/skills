@@ -1,0 +1,56 @@
+# .claude/kit/kit.yaml — kit 主宣告檔（跨模組；規格 source of truth：
+# kit/references/declaration-formats.md）。進版控。
+#
+# flat-key YAML：只支援 `key: "value"` 平鋪格式（bash 側 kit_decl_get／TS 側
+# declGet 皆為 grep 式解析，不支援巢狀、不引入 yq）。
+# 欄位留空 ＝ 該功能降級（消費端引擎必須在輸出明示降級，不靜默）。
+#
+# 與 intake.config.yaml 的關係：intake.config.yaml 維持原位原格式（intake 模組
+# 私有）；本檔是跨模組宣告，兩檔長期不合併。
+
+# 安裝時由 kit-init 寫死 kit 絕對路徑（資訊用；引擎皆自行定位，不消費此值）
+kit_root: ""
+
+# 已安裝模組（空白分隔；modules/{rtm,wave-gates,ratchet}.sh 安裝時自動登記）
+modules: ""
+
+# --- ratchet（品質債只降不升；引擎 kit/engines/ratchet.sh 消費）-------------
+
+# baseline JSON 路徑（repo-root 相對）；counter 檔以 BASELINE_FILE 原名取得
+baseline_file: "quality-baseline.json"
+# 慢 counter 名單（空白分隔）：compare 模式跳過（RATCHET_FULL=1 強制跑）
+slow_counters: ""
+
+# --- wave-gate（收尾閘門；引擎 kit/engines/wave-gate.sh ＋ merge-train 六支）--
+
+# Tier B 指令 cwd（monorepo 如 "apps/web"）；無 monorepo 留空
+app_workspace: ""
+# 收尾自癒指令（如 "pnpm install --frozen-lockfile && pnpm prisma generate"）；
+# 留空＝wave-merge-prep SKIP 明示
+merge_prep_cmd: ""
+# 收尾前驗存在的工具（空白分隔，如 "eslint tsc vitest"）；留空＝不驗
+tool_readiness: ""
+# merge-train 六支＋wave-gate 統一消費的基底分支
+base_branch: "main"
+# closure-lock-guard docs 豁免 glob（`|` 分隔；留空＝預設 *.md|.claude/dev/*）
+lock_docs_exempt: ""
+
+# --- rtm（需求追溯矩陣；引擎 kit/engines/rtm-check.ts——專案須自備 js-yaml）---
+
+# matrix 檔目錄（repo-root 相對）
+matrix_dir: "docs/rtm/matrix"
+# 合法 status（空白分隔；rtm-check PASS 統計行欄序＝此宣告序）
+status_enum: "implemented partial divergent planned na"
+# check7（impl_details 路徑存在性）fallback 基準（空白分隔；"." 表 repo 根）
+impl_path_bases: "."
+# require-requirements-sync 行為面錨（空白分隔目錄前綴，如
+# "src/server prisma/schema"）；留空＝reqsync gate SKIP 明示不攔
+reqsync_anchors: ""
+# 錨內放行的路徑段名（空白分隔，如 "__tests__ migrations"）
+reqsync_excludes: ""
+# check7 免驗 token（形似路徑的非路徑字串）
+rtm_nonpath_tokens: "Next.js Node.js"
+# 進階必填規則（留空／不宣告＝用引擎預設；見 engines/rtm-check.ts 頭註）：
+# rtm_notes_required: "divergent"
+# rtm_detail_specs_required: "implemented partial divergent"
+# rtm_impl_details_required: "implemented partial"
