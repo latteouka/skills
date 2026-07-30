@@ -11,7 +11,7 @@ scripts/wave-close.sh	kit:original	-	-	sha256:d15a2fb09accb4c2222ddf72b2740e1fb5
 scripts/wave-registry.sh	kit:original	-	-	sha256:8270f043816b30a3b875f005c50a7025665d45ee055946bb42c4ca47fd7c51da	2026-07-30	verbatim	-
 lib/common.sh	kit:original	-	-	sha256:ee24d31045e1ccae1883447c6b2d857ac62f59ee70ae16f3a00e56f31520f52b	2026-07-30	verbatim	-
 installers/intake.sh	kit:original	-	-	sha256:6ee488527574dce15c414512983926b783536f5999ed877fba0dc6339d6726fd	2026-07-30	verbatim	K34：backlog.md 模板改 backlog/ 目錄+INDEX
-tools/kit-audit.sh	kit:original	-	-	sha256:f8b9ae22e5679ab7860d4d0d57a73a03d5b3017f8ecc84538cd2e1e9424af0c4	2026-07-30	verbatim	-
+tools/kit-audit.sh	kit:original	-	-	sha256:a1cd0be5dcd1384b41ec22a968e1edae30d2cba28ee67c3b756e64748627b272	2026-07-30	verbatim	K5：無帳掃描擴 *.ts
 lib/canary-harness.sh	dfaa:scripts/hooks/__tests__/canary.sh	53a242db6	sha256:e9aea4f66d399ddef5a3bbd54e2009ab6ff0f85194a12bb949cfd6ff43cc75f2	sha256:53baba5d3c046f1d0daae24d8f104292e55f903836a0325ac1bf7ac10675b098	2026-07-31	parameterized	三斷言核心抽出；test_* 留 dfaa
 engines/canary.sh	dfaa:scripts/hooks/__tests__/canary.sh	53a242db6	sha256:e9aea4f66d399ddef5a3bbd54e2009ab6ff0f85194a12bb949cfd6ff43cc75f2	sha256:b70a60f9e222a74981768118d648249987a81c2599cb882b6a3a776c67b358bb	2026-07-31	parameterized	canary.d 消費引擎；同上游雙檔
 engines/pathspec-liveness.sh	dfaa:scripts/hooks/pathspec-liveness.sh	53a242db6	sha256:e0915b207faa94be108f4b410f28f899ff046f1269bbaff41e7fc41d48937f87	sha256:eb597a56932a749815bf59b87417866a2461a455436cf3290ca4bacfae840ab6	2026-07-31	parameterized	掃描對象改 pathspec-targets.conf（含目錄行）
@@ -29,5 +29,14 @@ tools/backlog-ls.sh	dfaa:scripts/backlog-ls.sh	53a242db6	sha256:368cbbaeaad654d8
 tools/backlog-retention.sh	dfaa:scripts/backlog-retention.sh	53a242db6	sha256:c891bc204e52843455d620853c5900859bf43e6bbee689784ef3e4369fcb16ce	sha256:f02679f04aa208a163bb3a9fbc647f72bda0331effd6c924c54cf5f8c6353fdf	2026-07-31	verbatim	同上；INDEX 寫 worktree 根上游瑕疵保留
 tools/backlog-lint.sh	dfaa:scripts/hooks/backlog-lint.sh	53a242db6	sha256:12a866be104b3b561dc36c725e5a9e314c25da684cc627347f4df9ffbb383f7c	sha256:fb96b55010063832d1e067389b460004d546bbd84a5d83e802a384b07e1ec26a	2026-07-31	parameterized	python3 前置檢查（唯一行為修正）
 tools/migrate-backlog-to-files.sh	dfaa:scripts/migrate-backlog-to-files.sh	53a242db6	sha256:0564f48edd7fa3ff2a2dc7d55599c0cbdc75611b032b36802e0d393078a9834a	sha256:00557c37a1a9183d92c76ca4d6f3aed0e1abb424822748d89ac3a9f360cd5cee	2026-07-31	verbatim	含 dfaa 日期常數 2026-07-29；真跑先 rm -rf 目標目錄
-installers/modules/_shared.sh	kit:original	-	-	sha256:8fe3e0f1bee39c57e5093807d45dda397a1cc56ab551556514afe759113bbc3d	2026-07-31	verbatim	K34：installer 共用（marker/scaffold）
+installers/modules/_shared.sh	kit:original	-	-	sha256:2697368f34ece1793e6329042fec62145cf31411516af309d2f0bbeee5d100fa	2026-07-31	verbatim	K34：installer 共用（marker/scaffold）
 installers/modules/backlog.sh	kit:original	-	-	sha256:c4577ccb1961b1c74e364cf1476eaf2a8363b5cc6d7161f3b0ef235e4efd4ea4	2026-07-31	verbatim	K34：backlog 模組安裝器
+engines/rtm-check.ts	dfaa:scripts/rtm-check.ts	53a242db6	sha256:ea335427ba4d7526b9e3a4e72ee82b7d9203490076e7fc27a020b1e7f04fb6be	sha256:fad9cf3dd84749ed661ccc5a3138e9b7655c94a8f295c70af28b6cd74fa707fe	2026-07-31	parameterized	req_id 通用化(rfp_id 相容)+--emit-index+createRequire 目標專案 js-yaml；K6：dfaa 宣告 impl_path_bases+nonpath 5 項
+gates/require-requirements-sync.sh	dfaa:scripts/hooks/require-requirements-sync.sh	53a242db6	sha256:644fa5888db1c918aa6fd2659f12d5a93faa95e64c9eb96f1928448147f53524	sha256:49b61b4e51b6881035f5d2043ffbc8b5e367f4973ded058899a7aa87b309b1a2	2026-07-31	parameterized	anchors/excludes 宣告化；excludes 段名比對寬鬆點（K6 checklist）
+gates/append-req-sync-skip-trailer.sh	dfaa:scripts/hooks/append-req-sync-skip-trailer.sh	53a242db6	sha256:a80c3850bdf77ed51da6eb75e5bc045dc65a6d3b6c0b71e832392f82e2e986b5	sha256:2c43acf086f98bebc5b31da6d1696a849fdcc4130fdf08a2f4182c689aee1785	2026-07-31	parameterized	trailer 保留；amend 不重複
+hooks/rtm-touch-reminder.sh	kit:original	-	-	sha256:e6e5443060bd9f1f5a62d5f68cdbc9c42503a8d02b0812cb5769b928684a5523	2026-07-31	verbatim	K5 讀側方向1：index 查詢 fail-open+session 去重+命中 log
+hooks/rtm-session-start.sh	kit:original	-	-	sha256:a4e7458b52b97a77eed68cde6ad6bed4ae8ed11e17f98a268adc455bd2751dc3	2026-07-31	verbatim	K5：index 重生+seen GC
+installers/kit-init.sh	kit:original	-	-	sha256:24c6e2373f17b0babc7aecd96f2e7c38e7c131d42f9967d3a1adb1da6010a720	2026-07-31	verbatim	K5：8 模組 dispatcher
+installers/modules/rtm.sh	kit:original	-	-	sha256:082be6383968aaa463921381e036bc863b6c9dbf4b03ac79f5cce2a7d038413c	2026-07-31	verbatim	K5：RTM 模組安裝器
+installers/modules/wave-gates.sh	kit:original	-	-	sha256:530a74b19fa7ae6ac6b3d68ad67940e6e9555670f45bd42410ddee2f77ea2d15	2026-07-31	verbatim	K5：wave-gates 模組安裝器
+installers/modules/ratchet.sh	kit:original	-	-	sha256:ef69c047b6b665c6df6e1e6381312677f6c6cec58bd0838626be9285448c463a	2026-07-31	verbatim	K5：ratchet 模組安裝器

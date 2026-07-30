@@ -23,7 +23,7 @@ assert_eq "" "$BAD_NF" "manifest 欄數守恆（8 欄，違規行號：${BAD_NF:
 # --- 2. 集合對帳：受管目錄實際檔案 vs manifest kit_path 雙向差集 = 0
 MANIFEST_SANDBOX="$(mktemp -d)"
 # 實際檔案清單（受管目錄遞迴 *.sh；目錄不存在時靜默跳過）
-(cd "$KIT_ROOT" && find engines gates tools hooks scripts lib installers -name '*.sh' -type f 2>/dev/null | sort) > "$MANIFEST_SANDBOX/actual.txt"
+(cd "$KIT_ROOT" && find engines gates tools hooks scripts lib installers \( -name '*.sh' -o -name '*.ts' \) -type f 2>/dev/null | sort) > "$MANIFEST_SANDBOX/actual.txt"
 # manifest kit_path 欄（去 #anchor 段落錨、去重——同檔多錨算一檔）
 awk -F'\t' '!/^#/ && !/^$/ { p=$1; sub(/#.*$/, "", p); print p }' "$MANIFEST" | sort -u > "$MANIFEST_SANDBOX/ledger.txt"
 ONLY_ACTUAL="$(comm -23 "$MANIFEST_SANDBOX/actual.txt" "$MANIFEST_SANDBOX/ledger.txt" | tr '\n' ' ')"

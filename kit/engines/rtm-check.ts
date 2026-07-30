@@ -43,7 +43,7 @@
 // createRequire 從「目標專案」node_modules 解析（kit 零 node 依賴不變——
 // rtm 模組要求專案自備 js-yaml）。
 //
-// 用法：node kit/engines/rtm-check.ts --repo-root <path> [--emit-index]
+// 用法：node kit/engines/rtm-check.ts --repo-root <path> [--decl-dir <path>] [--emit-index]
 // 統計輸出：整體＋各檔 status 計數——pass 時仍輸出（最小覆蓋率報表；
 // 訊息與統計行格式逐位保留上游，dfaa parity 由 K5 🤖-C 合約看守）。
 
@@ -58,12 +58,16 @@ import { pathToFileURL } from "node:url";
 
 let ROOT = "";
 let emitIndex = false;
+let declDirOverride = "";
 {
   const argv = process.argv.slice(2);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--repo-root") {
       ROOT = argv[++i] ?? "";
+    } else if (a === "--decl-dir") {
+      // 測試 seam（K2 引擎慣例）：宣告目錄覆寫，預設 <repo-root>/.claude/kit
+      declDirOverride = argv[++i] ?? "";
     } else if (a === "--emit-index") {
       emitIndex = true;
     } else {
@@ -122,7 +126,7 @@ function declGet(file: string, key: string, dflt: string): string {
   return dflt;
 }
 
-const KIT_YAML = path.join(ROOT, ".claude/kit/kit.yaml");
+const KIT_YAML = declDirOverride ? path.join(declDirOverride, "kit.yaml") : path.join(ROOT, ".claude/kit/kit.yaml");
 const splitWs = (s: string): string[] => s.split(/\s+/).filter(Boolean);
 
 const MATRIX_DIR_REL = declGet(KIT_YAML, "matrix_dir", "docs/rtm/matrix").replace(/\/+$/, "");

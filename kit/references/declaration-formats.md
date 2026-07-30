@@ -23,10 +23,14 @@ lock_docs_exempt: ""                       # closure-lock-guard docs 豁免 glob
 
 # --- rtm
 matrix_dir: "docs/rtm/matrix"
-status_enum: "implemented partial divergent planned na"
-impl_path_bases: ". apps/web apps/web/src"
+status_enum: "implemented partial divergent planned na"   # PASS 統計行欄序＝宣告序
+impl_path_bases: ". apps/web apps/web/src"                # check7 suffix-match 基準
+rtm_nonpath_tokens: "Next.js Node.js"                     # impl_details 非路徑 token 白名單（dfaa 遷移補 sigma.js 等）
+rtm_notes_required: "divergent"                           # 哪些 status 必填 notes
+rtm_detail_specs_required: "implemented partial divergent"
+rtm_impl_details_required: "implemented partial"
 reqsync_anchors: "apps/web/src/server apps/web/prisma/schema"
-reqsync_excludes: "__tests__ migrations"
+reqsync_excludes: "__tests__ migrations"                  # 路徑段名比對
 ```
 
 與 `intake.config.yaml` 的關係：intake.config.yaml 維持原位原格式（intake 模組私有）；kit.yaml 是跨模組宣告。`--rtm` 安裝時把 `matrix_dir` 回填 intake.config.yaml 的 `spec_layer`、rtm-check 指令回填 `spec_check`，接通 /triage 對帳線。兩檔長期不合併。
@@ -92,5 +96,5 @@ kit_path  upstream  upstream_commit  upstream_sha256  kit_sha256  absorbed  mode
 - `upstream`：`<專案>:<路徑>`（如 `dfaa:scripts/hooks/ratchet.sh`）；kit 自創記 `kit:original`；多源抽取記 `<專案>:(多源)` 並以 `-` hash 跳過解析
 - `mode` 三值：`verbatim`（逐位元組或僅路徑定位改動）｜`parameterized`（邏輯同構、參數抽宣告）｜`extracted-pattern`（抽模式不抽內容——上游漂移只提醒人工比對，不做 hash 判定）
 - `kit_path` 可帶 `#anchor` 段落錨（K1 為檔級粒度保留位：存在性檢查剝 fragment、hash 比對跳過）
-- **無帳掃描範圍**：`engines/ gates/ tools/ hooks/ scripts/ lib/ installers/` 遞迴 `*.sh`——目錄下存在但未列帳 = FAIL（與 `tests/cases/manifest.sh` 同步，改一邊必改另一邊）。templates/ 與 references/ 混有非機制檔，帳可選、掃描不強制
+- **無帳掃描範圍**：`engines/ gates/ tools/ hooks/ scripts/ lib/ installers/` 遞迴 `*.sh` 與 `*.ts`——目錄下存在但未列帳 = FAIL（與 `tests/cases/manifest.sh` 同步，改一邊必改另一邊）。templates/ 與 references/ 混有非機制檔，帳可選、掃描不強制
 - 消費者：`tools/kit-audit.sh`（三態判定）＋ `tests/cases/manifest.sh`（迴歸對帳，K2-K7 改檔忘記帳立即紅燈）
