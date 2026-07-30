@@ -22,6 +22,7 @@ merge_prep_cmd: "pnpm install --frozen-lockfile && pnpm prisma generate"
 tool_readiness: "eslint tsc vitest"
 base_branch: "main"                        # merge-train 六支+wave-gate 統一消費（K2 裁定，取代早稿 regate_branch）
 # lock_docs_exempt: "*.md|.claude/dev/*"   # closure-lock-guard docs 豁免 glob（| 分隔）；缺鍵=引擎預設、宣告空值=關閉豁免——預設不寫入
+# wave_branch_patterns: "worktree-* wave/*"  # wave merge 判別 branch glob（空白分隔）；三支消費者（wave-regate-guard/wave-close-guard/closure-lock-guard）各自傳入各自歷史預設（前兩者="worktree-* wave/*"，closure-lock-guard 較窄="worktree-*"）；缺鍵=用各自預設（=現行為）、宣告空值=該消費者關閉 wave 判別（明示降級）——預設不寫入
 
 # --- rtm
 matrix_dir: "docs/rtm/matrix"                             # 【必要欄位】
@@ -44,7 +45,16 @@ kit 引擎與消費者宣告之間原本沒有版本協商——中央 kit 一�
 - **`contract_version`**：宣告格式版本，引擎目前支援集合 `{1}`。缺席、空值或不在支援集合 → `tools/kit-doctor.sh` FAIL。本波只做 doctor 檢查層，引擎不讀此值自炸（版本強制留 K6+）。
 - **`kit_pin`**：kit repo 的 commit hash（短/長皆可）。空值或缺鍵＝不 pin（滾動跟隨 kit HEAD，doctor 明示不攔）；非空＝doctor 以 `git -C <kit_root> rev-parse HEAD` 取當前 kit HEAD 做**字串前綴比對**（宣告值絕不進 git 解析——防 revision 表達式注入），不一致預設 WARN。
 - **`--strict-pin`（K6 凍結期用法）**：K6 凍結期跑 `kit-doctor.sh --strict-pin`，pin 不符從 WARN 升為 FAIL——凍結期消費者必須釘死在驗收過的 kit commit，漂移即紅燈。宣告了 pin 但 kit root 非 git repo（驗不了）一律 FAIL：不可驗證不得當通過。
-- **必要欄位（doctor 檢查最小集）**：依 `modules` 宣告判定——`ratchet` 消費者的 `baseline_file`、`rtm` 消費者的 `matrix_dir`（上方範例標【必要欄位】者）。key 存在但空值（宣告降級）→ FAIL 指名；缺鍵＝引擎預設 → 不攔（`kit_decl_get` 兩態語意）。`lock_docs_exempt` 等「預設不寫入」的 key 不在必要集。
+- **必要欄位（doctor 檢查最小集）**：依 `modules` 宣告判定——`ratchet` 消費者的 `baseline_file`、`rtm` 消費者的 `matrix_dir`（上方範例標【必要欄位】者）。key 存在但空值（宣告降級）→ FAIL 指名；缺鍵＝引擎預設 → 不攔（`kit_decl_get` 兩態語意）。`lock_docs_exempt`、`wave_branch_patterns` 等「預設不寫入」的 key 不在必要集。
+
+### `wave_branch_patterns`（wave merge 判別 branch glob）
+
+merge-train 的 wave merge 判別（是否為「波」的 merge，而非一般 hotfix／feature merge）原本寫死 `worktree-*`／`wave/*` 兩種 branch 命名慣例——dfaa 自身的 wave 分支慣例。第二個消費專案若用 `feature/*` 等其他命名，判別點完全不觸發（merge-train 六支形同虛設）。`wave_branch_patterns` 開放宣告（空白分隔多個 glob，如 `"worktree-* feature/*"`），三支消費者各自用各自的歷史預設值呼叫 `kit_decl_get`（見上方範例行），宣告值一旦顯式給出即三支共用。
+
+- **wave-regate-guard／wave-close-guard**：glob 轉為交替正則片段（`*`→`.*`）比對 merge commit subject 是否含該 pattern；wave-close-guard 另外只消費「以 `*` 結尾」的 token 算出前綴抽取 wave id（無 `*` 的 token 對 id 抽取是 no-op，但仍可能被 wave-regate-guard 的純字面比對用到）。
+- **closure-lock-guard**：glob 原樣交給 `git for-each-ref` 當 ref pattern（`refs/heads/<glob>`），不經正則轉換。
+- **兩態語意**：缺鍵＝用該消費者的歷史預設（＝現行為，dfaa 零影響）；宣告空值＝該消費者關閉 wave 判別，明示降級（輸出含「已停用」），不誤攔也不誤放。
+- **已知限制**：squash merge 不留 merge commit，subject 判別與 id 抽取皆抓不到——本鍵只解決「branch／merge subject 命名慣例不同」，不解決 squash 消費者的偵測需求；真有此需求再議第二個 key。
 
 消費者健檢：`bash <kit>/tools/kit-doctor.sh [--decl-dir <path>] [--strict-pin]`——檢查項各自獨立報告行、fail-closed 匯總（任一 FAIL → exit 1），尾行 `inspected:N`（實檢 0 項 → exit 2，防假 0）。除上述外亦驗：恆綠 example gate（gates.d stub 與 `kit/templates/gates.d/` 模板字面相同＝未客製 → FAIL 列名）、canary.d 存在且 ≥1 fixture、gates.d↔canary.d 對帳（重用 `lib/canary-harness.sh` 的 `canary_reconcile_gates`，與 engines/canary.sh 同邏輯）。
 

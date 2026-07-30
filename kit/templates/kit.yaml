@@ -46,6 +46,15 @@ base_branch: "main"
 # 不寫入（缺鍵＝引擎預設 *.md|.claude/dev/*）；宣告空值＝關閉豁免（變嚴）
 # lock_docs_exempt: "*.md|.claude/dev/*"
 
+# wave merge 判別 branch glob（空白分隔，如 "worktree-* wave/*"）；三支
+# merge-train 消費者（wave-regate-guard／wave-close-guard／closure-lock-guard）
+# 各自傳入各自的歷史預設（wave-regate/close-guard＝"worktree-* wave/*"，
+# closure-lock-guard 較窄＝"worktree-*"——歷史差異見各檔頭註）；缺鍵＝用
+# 各自預設（＝現行為，dfaa 零影響），宣告空值＝該消費者關閉 wave 判別
+# （明示降級秒過，不誤攔也不誤放）。已知限制：squash merge 無 merge
+# commit，本鍵偵測不到，見 kit/references/declaration-formats.md。
+# wave_branch_patterns: "worktree-* wave/*"
+
 # --- rtm（需求追溯矩陣；引擎 kit/engines/rtm-check.ts——專案須自備 js-yaml）---
 
 # matrix 檔目錄（repo-root 相對）
