@@ -38,5 +38,5 @@ hooks/rtm-touch-reminder.sh	kit:original	-	-	sha256:e6e5443060bd9f1f5a62d5f68cdb
 hooks/rtm-session-start.sh	kit:original	-	-	sha256:a4e7458b52b97a77eed68cde6ad6bed4ae8ed11e17f98a268adc455bd2751dc3	2026-07-30	verbatim	-	K5：index 重生+seen GC
 installers/kit-init.sh	kit:original	-	-	sha256:5e88e3b50684df5b779cb2a5cedb1055ce83dfaf26a453907cf33e200b7358cd	2026-07-30	verbatim	-	K5：8 模組 dispatcher；K5-C 安全修 H1/H2
 installers/modules/rtm.sh	kit:original	-	-	sha256:082be6383968aaa463921381e036bc863b6c9dbf4b03ac79f5cce2a7d038413c	2026-07-30	verbatim	-	K5：RTM 模組安裝器
-installers/modules/wave-gates.sh	kit:original	-	-	sha256:530a74b19fa7ae6ac6b3d68ad67940e6e9555670f45bd42410ddee2f77ea2d15	2026-07-30	verbatim	-	K5：wave-gates 模組安裝器
+installers/modules/wave-gates.sh	kit:original	-	-	sha256:6ec054485bfd1979b506affe14a452f4fcaed06e9bf6c2b21d04f43ff5038eaf	2026-07-30	verbatim	-	K5：wave-gates 模組安裝器; K5.5: lock_docs_exempt 不 seed（兩態語意）
 installers/modules/ratchet.sh	kit:original	-	-	sha256:ef69c047b6b665c6df6e1e6381312677f6c6cec58bd0838626be9285448c463a	2026-07-30	verbatim	-	K5：ratchet 模組安裝器
