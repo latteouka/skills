@@ -1,31 +1,10 @@
-# 📋 Backlog
+# 📋 Backlog（一筆一檔）
 
-> triage 後的料倉。`/wave --from backlog` 只取 `status: ready` 的項。
-> ⚠️需客戶確認 的項不會被自動取用，須人工改為 ready 或 dropped。
->
-> **兩個入口**（見 `references/triage-rules.md` 步驟 0）：判斷完成（填得出 type/flow/matrix）
-> 可直接寫此檔；填不出來就寫 `inbox.md` 等 triage。
-
-| id | type | pri | flow | matrix | status | summary |
-|---|---|---|---|---|---|---|
-
----
-
-## 明細區（按 id 排序）
-
-> 表格是索引（快速掃視），明細區是完整內容。兩者靠 `id` 對應。
-
-### B-001
-
-- **from**: INB-042（口述 2026-07-25）／INB-051（逐字稿:0724會議）
-- **matrix**: 101-案件與證物管理.yaml #12
-- **touches**: `<repo-root-relative exact path/glob>`；未知時改填 `unknown:<具體原因>`
-- **evidence**: <為何判定此 type 的依據>
-- **repro**: <重現步驟；BUG 才需要>
-- **wave**: —
-- **proof**: <完成後必填：commit hash／實測輸出／counter 變化>
-
----
+> triage 後的料倉。一筆工作項＝一個 `B-NNN.md`（格式見 `kit/templates/backlog/B-item.md`），
+> ID 由 `~/projects/skills/kit/tools/next-id.sh --touch B` 原子取號。
+> `/wave --from backlog` 只取 `status: ready` 的項；查詢用 `backlog-ls.sh`（如
+> `--status ready --count`）。⚠️需客戶確認 的項不會被自動取用，須人工改為 ready 或 dropped。
+> schema 由 pre-commit 的 `backlog-lint.sh` 把關；過期清理用 `backlog-retention.sh --dry-run`。
 
 ## 欄位說明
 
@@ -37,8 +16,10 @@
 | `⚠️需客戶確認` | 硬閘門，wave 取不到。須人工改 ready 或 dropped |
 | `blocked:{原因}` | 有明確 blocker |
 | `🔶止血:{wave-id}` | **已緩解但未根治**——症狀消失、根因仍在。不可視同完成 |
-| `done:{wave-id}` | 完成。**必須同時填 `proof`**，否則視同未完成 |
+| `done:{wave-id}` | 完成。**必須同時填 `proof` 與 `closed` 日期**，否則視同未完成 |
 | `dropped:{理由}` | 不做 |
+| `orphan-review` | 遷移時無對應表列，待 triage 裁決 |
+| `placeholder` | `next-id.sh --touch` 的佔位檔，取號後應立即填寫 |
 
 ### `pri` 值域
 

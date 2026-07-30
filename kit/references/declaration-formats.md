@@ -11,8 +11,8 @@ kit_root: "/Users/x/projects/skills/kit"   # 安裝時寫死絕對路徑
 modules: "intake backlog rtm wave-gates ratchet"   # 已安裝模組（空白分隔）
 
 # --- ratchet
-baseline_file: "quality-baseline.json"     # repo-root 相對
-tighten_branch: "main"
+baseline_file: "quality-baseline.json"     # repo-root 相對；引擎以 BASELINE_FILE 原名提供給 counter
+slow_counters: ""                          # 空白分隔；compare 模式跳過（RATCHET_FULL=1 強制跑）。dfaa 遷移必填 "eslint-warnings"
 
 # --- wave-gate
 app_workspace: "apps/web"                  # Tier B 指令 cwd；無 monorepo 留空
@@ -33,7 +33,13 @@ reqsync_excludes: "__tests__ migrations"
 
 ## counters.d/
 
-ratchet counter 宣告，每 counter 一檔 `<name>.counter.sh`，檔名即 counter 名、須與 baseline JSON 的 `counters.<name>` 鍵對應（引擎雙向核對：有鍵無檔或有檔無鍵皆 fail-closed）。
+ratchet counter 宣告，每 counter 一檔 `<name>.counter.sh`，檔名即 counter 名（函式名 = `count_` + 名稱 `-`→`_`）、須與 baseline JSON 的 `counters.<name>` 鍵對應（引擎雙向核對：有鍵無檔或有檔無鍵皆 fail-closed）。
+
+補充契約（K34 凍結）：
+- **counter 檔只保證拿到 `PROJECT_ROOT` 與 `BASELINE_FILE`** 兩個環境變數；禁 `set -e`／禁 `exit`（sourced 進引擎）
+- **共用 helper**：`NN-*.lib.sh` 先按字典序 source，不參與名稱推導與雙向核對
+- **scope-conditioning 選配**：定義 `inputs_<name>()`（stdout 一行一 pathspec）→ compare 模式 push range 未碰輸入時沿用 baseline；未定義＝永不 skip
+- `--count <name>` 單獨取值（`--count-<name>` 糖衣等價）
 
 ```bash
 #!/usr/bin/env bash
