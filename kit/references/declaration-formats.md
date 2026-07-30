@@ -19,7 +19,7 @@ app_workspace: "apps/web"                  # Tier B 指令 cwd；無 monorepo �
 merge_prep_cmd: "pnpm install --frozen-lockfile && pnpm prisma generate"
 tool_readiness: "eslint tsc vitest"
 base_branch: "main"                        # merge-train 六支+wave-gate 統一消費（K2 裁定，取代早稿 regate_branch）
-lock_docs_exempt: ""                       # closure-lock-guard docs 豁免 glob（| 分隔；空=預設 *.md|.claude/dev/*）
+# lock_docs_exempt: "*.md|.claude/dev/*"   # closure-lock-guard docs 豁免 glob（| 分隔）；缺鍵=引擎預設、宣告空值=關閉豁免——預設不寫入
 
 # --- rtm
 matrix_dir: "docs/rtm/matrix"

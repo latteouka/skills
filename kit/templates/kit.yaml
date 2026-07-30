@@ -33,9 +33,9 @@ merge_prep_cmd: ""
 tool_readiness: ""
 # merge-train 六支＋wave-gate 統一消費的基底分支
 base_branch: "main"
-# closure-lock-guard docs 豁免 glob（`|` 分隔）；留空＝無豁免（降級）；
-# 刪除本行＝引擎預設 *.md|.claude/dev/*
-lock_docs_exempt: ""
+# closure-lock-guard docs 豁免 glob（`|` 分隔）；引擎預設非空，故本 key 預設
+# 不寫入（缺鍵＝引擎預設 *.md|.claude/dev/*）；宣告空值＝關閉豁免（變嚴）
+# lock_docs_exempt: "*.md|.claude/dev/*"
 
 # --- rtm（需求追溯矩陣；引擎 kit/engines/rtm-check.ts——專案須自備 js-yaml）---
 

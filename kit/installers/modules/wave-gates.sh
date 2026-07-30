@@ -38,7 +38,8 @@ kit_module_decl_key "${root}" base_branch "main"
 kit_module_decl_key "${root}" app_workspace ""
 kit_module_decl_key "${root}" merge_prep_cmd ""
 kit_module_decl_key "${root}" tool_readiness ""
-kit_module_decl_key "${root}" lock_docs_exempt ""
+# lock_docs_exempt 不 seed：引擎預設非空（*.md|.claude/dev/*），兩態語意下
+# seed 空值＝關閉豁免（變嚴），缺鍵才吃引擎預設——要覆寫的專案自行加 key
 kit_module_register "${root}" wave-gates
 
 decl="${root}/.claude/kit"
