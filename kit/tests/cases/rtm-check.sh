@@ -63,6 +63,7 @@ rc_bash_hash() {
 }
 
 RC_START=$TESTS_RUN
+RC_SKIP_START=$TESTS_SKIPPED
 
 if [ -n "$RC_RUNTIME" ]; then
 
@@ -186,11 +187,12 @@ EOF
 else
     echo "SKIP: rtm-check 引擎測試需可用 runtime——本機缺 ${RC_MISSING}（記 caveat：引擎行為未在本機驗證）"
     assert_contains "$RC_MISSING" "node" "SKIP 訊息指明缺什麼 runtime"
-    # 佔位斷言補到與 runtime 分支同數（防 assertion-baseline 假紅）
-    while [ $((TESTS_RUN - RC_START)) -lt "$RC_EXPECTED" ]; do
-        assert_eq "SKIP" "SKIP" "rtm-check SKIP 佔位（維持斷言數恆定）"
+    # 缺 runtime：以明示 SKIP 補到與 runtime 分支同數（計入 skipped、不計入
+    # assertion 數）——baseline 守衛比對 assertions+skipped，總數跨機器守恆。
+    while [ $(( (TESTS_RUN - RC_START) + (TESTS_SKIPPED - RC_SKIP_START) )) -lt "$RC_EXPECTED" ]; do
+        kit_test_skip "rtm-check 引擎測試需 runtime，本機缺 ${RC_MISSING}——未驗"
     done
 fi
 
-# 兩分支共同的 delta 守衛：斷言數必須恰為 RC_EXPECTED（新增測試須同步改常數）
-assert_eq "$RC_EXPECTED" "$((TESTS_RUN - RC_START))" "rtm-check 斷言數恆定守衛（改測試須同步 RC_EXPECTED）"
+# 兩分支共同的 delta 守衛：斷言＋SKIP 數必須恰為 RC_EXPECTED（新增測試須同步改常數）
+assert_eq "$RC_EXPECTED" "$(( (TESTS_RUN - RC_START) + (TESTS_SKIPPED - RC_SKIP_START) ))" "rtm-check 斷言數恆定守衛（改測試須同步 RC_EXPECTED）"

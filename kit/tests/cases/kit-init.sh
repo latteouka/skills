@@ -133,10 +133,10 @@ if [ -n "$KI_RUNTIME" ]; then
     assert_contains "$ki_out" "rtm-check: PASS" "② rtm-check 輸出 PASS 統計行"
     assert_contains "$ki_out" "planned=1" "② 統計行 planned=1（scaffold 條目）"
 else
-    echo "SKIP: 無 node≥23.6/tsx——scaffold matrix 過 rtm-check 小節跳過（佔位斷言維持 baseline）"
-    assert_eq "SKIP" "SKIP" "② [SKIP 佔位] scaffold matrix 過 rtm-check（exit 0）"
-    assert_eq "SKIP" "SKIP" "② [SKIP 佔位] rtm-check 輸出 PASS 統計行"
-    assert_eq "SKIP" "SKIP" "② [SKIP 佔位] 統計行 planned=1（scaffold 條目）"
+    # 缺 runtime：逐檢查點明示 SKIP（計入 skipped、不計入 assertion 數），不用恆真斷言佔位。
+    kit_test_skip "無 node≥23.6/tsx——② scaffold matrix 過 rtm-check（exit 0）未驗"
+    kit_test_skip "無 node≥23.6/tsx——② rtm-check 輸出 PASS 統計行未驗"
+    kit_test_skip "無 node≥23.6/tsx——② 統計行 planned=1（scaffold 條目）未驗"
 fi
 rm -rf "$KI_S2"
 
