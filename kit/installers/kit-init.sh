@@ -24,6 +24,12 @@
 set -u
 
 KIT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+case "${KIT_ROOT}" in */.claude/worktrees/*)
+    if [ "${KIT_INIT_ALLOW_WORKTREE:-0}" != "1" ]; then
+        echo "錯誤：不可從 worktree 安裝（KIT_ROOT=${KIT_ROOT} 會隨 worktree 清除失效，hook 將指向死路徑鎖死 commit/push）。請從主 checkout 執行。" >&2
+        exit 1
+    fi ;;
+esac
 
 usage() {
     echo "用法: kit-init.sh [--intake] [--backlog] [--rtm] [--wave-gates] [--ratchet] [--all] [--non-interactive]" >&2

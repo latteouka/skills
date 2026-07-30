@@ -1,3 +1,4 @@
+export KIT_INIT_ALLOW_WORKTREE=1  # 測試在 worktree 跑，豁免 H2 安裝守衛（守衛本身另有專測）
 # kit-init.sh — dispatcher + modules/{rtm,wave-gates,ratchet} 測試（K5 🤖-4）
 #
 # runtime 政策（同 rtm-check.sh 合約）：無 node≥23.6/tsx → 「scaffold matrix
@@ -205,3 +206,20 @@ assert_contains "$KI_SKILL" "標準組" "⑤ SKILL.md 含三檔組合：標準�
 assert_contains "$KI_SKILL" "全套" "⑤ SKILL.md 含三檔組合：全套"
 assert_contains "$KI_SKILL" "K7" "⑤ SKILL.md 標記 K7 未實裝"
 assert_contains "$KI_SKILL" ".kit-init-progress.yaml" "⑤ SKILL.md 含 progress 檔說明"
+
+# --- [K5-C 安全修] H2：worktree 安裝守衛（無豁免時必擋）
+H2_OUT="$(KIT_INIT_ALLOW_WORKTREE=0 bash "$KIT_ROOT/installers/kit-init.sh" --intake 2>&1)"
+H2_RC=$?
+assert_eq "1" "$H2_RC" "H2: worktree 安裝無豁免 exit 1"
+assert_contains "$H2_OUT" "worktree" "H2: 錯誤訊息指明 worktree"
+
+# --- [K5-C 安全修] H1：空檔 settings.json → merge 拒絕（非假成功）
+H1_SANDBOX="$(kit_test_sandbox)"
+mkdir -p "$H1_SANDBOX/.claude"
+printf '' > "$H1_SANDBOX/.claude/settings.json"
+H1_OUT="$( cd "$H1_SANDBOX" && bash "$KIT_ROOT/installers/kit-init.sh" --intake --non-interactive 2>&1 )"
+H1_RC=$?
+assert_eq "1" "$H1_RC" "H1: 空檔 settings.json exit 1（不再假成功）"
+assert_contains "$H1_OUT" "object" "H1: 錯誤訊息指明非 JSON object"
+assert_eq "0" "$(printf '%s' "$(cat "$H1_SANDBOX/.claude/settings.json" | wc -c | tr -d ' ')")" "H1: 空檔未被覆寫（零寫入）"
+rm -rf "$H1_SANDBOX"

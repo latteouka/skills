@@ -1,3 +1,4 @@
+export KIT_INIT_ALLOW_WORKTREE=1  # 測試在 worktree 跑，豁免 H2 安裝守衛（守衛本身另有專測）
 # installer-backlog.sh — modules/backlog.sh 冪等 + husky marker + triage-rules 斷鏈修驗證
 MOD="$KIT_ROOT/installers/modules/backlog.sh"
 

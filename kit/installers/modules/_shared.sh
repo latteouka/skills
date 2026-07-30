@@ -37,6 +37,21 @@ kit_scaffold_file() {
     fi
 }
 
+# kit_guard_worktree_install — KIT_ROOT 在 worktree 內＝路徑會隨清除失效（hook 指死路徑
+# 鎖死全 repo commit/push）。拒裝；測試用 KIT_INIT_ALLOW_WORKTREE=1 豁免。
+kit_guard_worktree_install() {
+    local kr="$1"
+    case "$kr" in
+        */.claude/worktrees/*)
+            if [ "${KIT_INIT_ALLOW_WORKTREE:-0}" != "1" ]; then
+                echo "錯誤：不可從 worktree 安裝（KIT_ROOT=${kr} 會隨 worktree 清除失效）。請從主 checkout 執行。" >&2
+                return 1
+            fi
+            ;;
+    esac
+    return 0
+}
+
 # kit_module_settings_merge <settings.json> <sentinel> <jq-filter>
 # settings.json 合法性驗證 → sentinel 已存在則 skip（冪等）→ 備份 → jq merge 原子寫入。
 # sentinel＝merge 後必然出現在檔內的字串（如 hook 指令路徑），用它判斷「已安裝」。
@@ -45,17 +60,25 @@ kit_module_settings_merge() {
     local settings="$1" sentinel="$2" filter="$3" tmp
     command -v jq >/dev/null 2>&1 || { echo "錯誤：settings merge 需要 jq。" >&2; return 1; }
     [ -f "$settings" ] || printf '{}\n' > "$settings"
-    if ! jq empty "$settings" >/dev/null 2>&1; then
-        echo "錯誤：${settings} 不是合法 JSON，不做 merge。" >&2
+    if ! jq -e 'type=="object"' "$settings" >/dev/null 2>&1; then
+        echo "錯誤：${settings} 不是合法 JSON object（空檔/array/字串皆拒），不做 merge。" >&2
         return 1
     fi
     if grep -qF "$sentinel" "$settings" 2>/dev/null; then
         KIT_MODULE_SKIPPED="${KIT_MODULE_SKIPPED} settings.json(已安裝)"
         return 0
     fi
-    cp "$settings" "${settings}.bak-$(date '+%Y%m%d%H%M%S')"
-    tmp="$(mktemp)"
-    jq "$filter" "$settings" > "$tmp" && mv "$tmp" "$settings"
+    cp "$settings" "${settings}.bak-$(date '+%Y%m%d%H%M%S').$$" || { echo "錯誤：settings 備份失敗，不做 merge。" >&2; return 1; }
+    tmp="${settings}.tmp.$$"
+    if ! jq "$filter" "$settings" > "$tmp" 2>/dev/null; then
+        echo "錯誤：jq merge 失敗（filter 或磁碟問題），settings 未變更。" >&2
+        rm -f "$tmp"; return 1
+    fi
+    if ! jq -e 'type=="object"' "$tmp" >/dev/null 2>&1; then
+        echo "錯誤：merge 產物不是合法 JSON object，拒絕覆寫。" >&2
+        rm -f "$tmp"; return 1
+    fi
+    mv "$tmp" "$settings" || { rm -f "$tmp"; return 1; }
     KIT_MODULE_CREATED="${KIT_MODULE_CREATED} settings.json"
 }
 
