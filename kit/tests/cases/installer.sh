@@ -16,12 +16,13 @@ EOF
 (cd "$SANDBOX" && bash "$INST" --non-interactive) >/dev/null 2>&1
 
 assert_eq "1" "$([ -f "$SANDBOX/.claude/dev/inbox.md" ] && echo 1 || echo 0)" "建立 inbox.md"
-assert_eq "1" "$([ -f "$SANDBOX/.claude/dev/backlog.md" ] && echo 1 || echo 0)" "建立 backlog.md"
+assert_eq "1" "$([ -d "$SANDBOX/.claude/dev/backlog" ] && echo 1 || echo 0)" "建立 backlog/ 目錄"
+assert_eq "1" "$([ -f "$SANDBOX/.claude/dev/backlog/INDEX.md" ] && echo 1 || echo 0)" "建立 backlog/INDEX.md"
 assert_eq "1" "$([ -f "$SANDBOX/.claude/dev/intake.config.yaml" ] && echo 1 || echo 0)" "建立 config"
 
-BACKLOG_CONTENT="$(cat "$SANDBOX/.claude/dev/backlog.md")"
-assert_contains "$BACKLOG_CONTENT" '- **touches**:' "backlog 模板含 touches 欄"
-assert_contains "$BACKLOG_CONTENT" 'unknown:' "backlog 模板示範未知 touches 標記"
+BACKLOG_CONTENT="$(cat "$SANDBOX/.claude/dev/backlog/INDEX.md")"
+assert_contains "$BACKLOG_CONTENT" '`touches`' "backlog INDEX 含 touches 欄說明"
+assert_contains "$BACKLOG_CONTENT" 'unknown:' "backlog INDEX 示範未知 touches 標記"
 
 S="$(cat "$SANDBOX/.claude/settings.json")"
 assert_contains "$S" "existing.sh" "既有 hook 保留"
@@ -51,7 +52,7 @@ assert_eq "1" "$rc" "壞 JSON 中止安裝"
 assert_eq "{ this is not json" "$(cat "$BAD/.claude/settings.json")" "壞 JSON 未被改動"
 # 補充驗證：壞 JSON 時不應建立 .claude/dev/ 下的檔案
 assert_eq "0" "$([ -f "$BAD/.claude/dev/inbox.md" ] && echo 1 || echo 0)" "壞 JSON 時不建 inbox.md"
-assert_eq "0" "$([ -f "$BAD/.claude/dev/backlog.md" ] && echo 1 || echo 0)" "壞 JSON 時不建 backlog.md"
+assert_eq "0" "$([ -d "$BAD/.claude/dev/backlog" ] && echo 1 || echo 0)" "壞 JSON 時不建 backlog/ 目錄"
 assert_eq "0" "$([ -f "$BAD/.claude/dev/intake.config.yaml" ] && echo 1 || echo 0)" "壞 JSON 時不建 config"
 rm -rf "$BAD"
 

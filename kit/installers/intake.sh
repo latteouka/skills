@@ -45,7 +45,10 @@ install_file() {
 }
 
 install_file "${KIT_ROOT}/templates/inbox.md"   "${dev}/inbox.md"   "inbox.md"
-install_file "${KIT_ROOT}/templates/backlog.md" "${dev}/backlog.md" "backlog.md"
+# backlog：一筆一檔目錄制（K4 吸收 dfaa 制；舊單檔 backlog.md 模板已退役，
+# 存量單檔用 kit/tools/migrate-backlog-to-files.sh 遷移）
+mkdir -p "${dev}/backlog"
+install_file "${KIT_ROOT}/templates/backlog/INDEX.md" "${dev}/backlog/INDEX.md" "backlog/INDEX.md"
 
 # --- config：互動問 1 題（其餘用預設）
 cfg="${dev}/intake.config.yaml"

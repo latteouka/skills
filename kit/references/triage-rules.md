@@ -1,6 +1,6 @@
 # Triage 判斷樹
 
-對 `inbox.md` 中每一筆 `## INB-NNN` 執行下列步驟，結果寫入 `backlog/` 目錄（一筆一檔 `backlog/B-NNN.md`，ID 由 `scripts/next-id.sh --touch B` 原子取號）。
+對 `inbox.md` 中每一筆 `## INB-NNN` 執行下列步驟，結果寫入 `backlog/` 目錄（一筆一檔 `backlog/B-NNN.md`，ID 由 `~/projects/skills/kit/tools/next-id.sh --touch B` 原子取號）。
 
 ## -1. 先合併分片（inbox.d/ 存在時必做第一步）
 
@@ -18,7 +18,7 @@
 
 ## 0. 兩個入口——分界是「判斷完成了沒」，不是「誰寫的」
 
-**能填得出 `type` / `flow` / `matrix` 三個欄位 → 直接寫 `backlog/B-NNN.md`（`scripts/next-id.sh --touch B` 取號），跳過 inbox。**
+**能填得出 `type` / `flow` / `matrix` 三個欄位 → 直接寫 `backlog/B-NNN.md`（`~/projects/skills/kit/tools/next-id.sh --touch B` 取號），跳過 inbox。**
 **填不出來（或當下沒時間查證）→ 寫 `inbox.md`，等 triage。**
 
 | 來源 | 走哪 | 為什麼 |
