@@ -79,3 +79,108 @@ printf 'base_branch: "trunk"\n' > "$MT_BB/.claude/kit/kit.yaml"
 assert_eq "1" "$?" "宣告 base_branch=trunk：wave merge＋dashboard 殘留 → 必攔（宣告線活的）"
 
 rm -rf "$MT_SANDBOX" "$MT_BB"
+
+# ── ④ wave_branch_patterns 宣告消費驗證（K55 task-9）───────────────
+# 盤點結果：merge-train 六支中三支寫死 worktree-/wave/ 判別——
+# wave-regate-guard（merge subject 交替比對）、wave-close-guard（id 抽取）、
+# closure-lock-guard（branch glob 餵 for-each-ref）。三支改讀宣告
+# `wave_branch_patterns`，缺鍵時各自套用各自的歷史預設值（逐位元組＝現行
+# 為）。本節驗證：④a-e 紅→綠切換＋空值降級（wave-regate-guard 代表）；
+# ④f-g id 抽取線活的（wave-close-guard）；④h-j branch glob 線活的＋空值
+# 降級（closure-lock-guard）。
+
+# ④a-e：未宣告時 feature/x 不被視為 wave merge；宣告 "feature/*" 後被
+# 辨識；宣告空值後判別停用（即使有 feature/x merge 也放行，且明示降級）。
+MT_WBP="$(mktemp -d)"
+git -C "$MT_WBP" init -q -b main
+git -C "$MT_WBP" -c user.email=t@local -c user.name=t \
+    commit --allow-empty -q -m init
+git -C "$MT_WBP" update-ref refs/remotes/origin/main HEAD
+
+git -C "$MT_WBP" checkout -q -b feature/x
+git -C "$MT_WBP" -c user.email=t@local -c user.name=t \
+    commit --allow-empty -q -m "feature work"
+git -C "$MT_WBP" checkout -q main
+git -C "$MT_WBP" -c user.email=t@local -c user.name=t \
+    merge -q --no-ff feature/x -m "Merge branch 'feature/x'"
+
+(cd "$MT_WBP" && bash "$MT_DIR/wave-regate-guard.sh" check) >/dev/null 2>&1
+assert_eq "0" "$?" "④a 未宣告 wave_branch_patterns：feature/x merge 不被視為 wave merge（現行為）→ 放行"
+
+mkdir -p "$MT_WBP/.claude/kit"
+printf 'wave_branch_patterns: "feature/*"\n' > "$MT_WBP/.claude/kit/kit.yaml"
+WBP_OUT="$(cd "$MT_WBP" && bash "$MT_DIR/wave-regate-guard.sh" check 2>&1)"
+WBP_RC=$?
+assert_eq "1" "$WBP_RC" "④b 宣告 wave_branch_patterns=feature/*：同一 feature/x merge 被辨識為 wave merge → 必攔（新行為）"
+assert_contains "$WBP_OUT" "BLOCK" "④c 宣告後輸出含 BLOCK"
+
+printf 'wave_branch_patterns: ""\n' > "$MT_WBP/.claude/kit/kit.yaml"
+WBP_OUT2="$(cd "$MT_WBP" && bash "$MT_DIR/wave-regate-guard.sh" check 2>&1)"
+WBP_RC2=$?
+assert_eq "0" "$WBP_RC2" "④d 宣告 wave_branch_patterns 空值：判別停用 → 放行（即使有 feature/x merge）"
+assert_contains "$WBP_OUT2" "已停用" "④e 空值降級輸出明示已停用"
+
+rm -rf "$MT_WBP"
+
+# ④f-g：wave-close-guard 用自訂 pattern 抽出 wave id，對應 dashboard 判定
+MT_WCG="$(mktemp -d)"
+git -C "$MT_WCG" init -q -b main
+mkdir -p "$MT_WCG/.claude/dev" "$MT_WCG/.claude/kit"
+printf 'wave_branch_patterns: "feature/*"\n' > "$MT_WCG/.claude/kit/kit.yaml"
+git -C "$MT_WCG" -c user.email=t@local -c user.name=t \
+    commit --allow-empty -q -m init
+git -C "$MT_WCG" update-ref refs/remotes/origin/main HEAD
+
+git -C "$MT_WCG" checkout -q -b feature/zeta
+echo "# wave zeta" > "$MT_WCG/.claude/dev/wave-zeta.md"
+git -C "$MT_WCG" add -A
+git -C "$MT_WCG" -c user.email=t@local -c user.name=t \
+    commit -q -m "feature zeta work + dashboard"
+git -C "$MT_WCG" checkout -q main
+git -C "$MT_WCG" -c user.email=t@local -c user.name=t \
+    merge -q --no-ff feature/zeta -m "Merge branch 'feature/zeta'"
+
+(cd "$MT_WCG" && bash "$MT_DIR/wave-close-guard.sh" check) >/dev/null 2>&1
+assert_eq "1" "$?" "④f 宣告 feature/*：feature/zeta merge＋dashboard 殘留 → 必攔（id 抽取線活的）"
+
+git -C "$MT_WCG" rm -q .claude/dev/wave-zeta.md
+git -C "$MT_WCG" -c user.email=t@local -c user.name=t commit -q -m "wave-close 清理"
+(cd "$MT_WCG" && bash "$MT_DIR/wave-close-guard.sh" check) >/dev/null 2>&1
+assert_eq "0" "$?" "④g dashboard 已清 → 放行"
+
+rm -rf "$MT_WCG"
+
+# ④h-j：closure-lock-guard 用自訂 pattern 要求先取鎖；宣告空值降級
+MT_CLG="$(mktemp -d)"
+git -C "$MT_CLG" init -q -b main
+git -C "$MT_CLG" -c user.email=t@local -c user.name=t \
+    commit --allow-empty -q -m init
+mkdir -p "$MT_CLG/.claude/kit"
+printf 'wave_branch_patterns: "feature/*"\n' > "$MT_CLG/.claude/kit/kit.yaml"
+
+git -C "$MT_CLG" checkout -q -b feature/omega
+echo "code" > "$MT_CLG/omega.ts"
+git -C "$MT_CLG" add omega.ts
+git -C "$MT_CLG" -c user.email=t@local -c user.name=t commit -q -m "feat: omega"
+MT_OMEGA_TIP="$(git -C "$MT_CLG" rev-parse HEAD)"
+git -C "$MT_CLG" checkout -q main
+
+echo "${MT_OMEGA_TIP}" > "$MT_CLG/.git/MERGE_HEAD"
+echo "merged" > "$MT_CLG/omega.ts"
+git -C "$MT_CLG" add omega.ts
+(cd "$MT_CLG" && bash "$MT_DIR/closure-lock-guard.sh") >/dev/null 2>&1
+assert_eq "2" "$?" "④h 宣告 feature/*：merge feature branch 無鎖 → 擋（branch glob 判別線活的）"
+rm -f "$MT_CLG/.git/MERGE_HEAD"
+git -C "$MT_CLG" reset -q HEAD -- omega.ts
+rm -f "$MT_CLG/omega.ts"
+
+printf 'wave_branch_patterns: ""\n' > "$MT_CLG/.claude/kit/kit.yaml"
+echo "${MT_OMEGA_TIP}" > "$MT_CLG/.git/MERGE_HEAD"
+echo "merged" > "$MT_CLG/omega.ts"
+git -C "$MT_CLG" add omega.ts
+CLG_OUT="$(cd "$MT_CLG" && bash "$MT_DIR/closure-lock-guard.sh" 2>&1)"
+CLG_RC=$?
+assert_eq "0" "$CLG_RC" "④i 宣告空值：降級後放行（不誤擋，即使無鎖）"
+assert_contains "$CLG_OUT" "已停用" "④j 空值降級輸出明示已停用"
+
+rm -rf "$MT_CLG"

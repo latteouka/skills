@@ -95,8 +95,11 @@ base_branch="$(kit_decl_get "${kit_yaml}" base_branch main)"
 app_workspace="$(kit_decl_get "${kit_yaml}" app_workspace '')"
 tool_readiness="$(kit_decl_get "${kit_yaml}" tool_readiness '')"
 
-lock_sh="${kit_root}/gates/merge-train/wave-closure-lock.sh"
-regate_sh="${kit_root}/gates/merge-train/wave-regate-guard.sh"
+# WAVE_GATE_LOCK_SH_OVERRIDE／WAVE_GATE_REGATE_SH_OVERRIDE：測試 seam——
+# 讓測試注入假 lock／regate script 驗證收口寫入失敗路徑（K55 硬化，見下方
+# 「收口」段）。正常呼叫不帶這兩個環境變數，用真實路徑。
+lock_sh="${WAVE_GATE_LOCK_SH_OVERRIDE:-${kit_root}/gates/merge-train/wave-closure-lock.sh}"
+regate_sh="${WAVE_GATE_REGATE_SH_OVERRIDE:-${kit_root}/gates/merge-train/wave-regate-guard.sh}"
 prep_sh="${kit_root}/gates/merge-train/wave-merge-prep.sh"
 
 fail=0
@@ -297,14 +300,33 @@ echo ""
 if [ "${fail}" -eq 0 ]; then
   echo "[wave-gate:${phase}] 全部 gate PASS（SKIP 項如上列）"
   if [ "${phase}" = "收尾" ]; then
+    # 收口寫入不得靠 `|| true` 吞掉：gate 全綠但放行憑證／鎖狀態沒真的落地，
+    # 必須跟「gate 本身 FAIL」一樣可被看見、可被擋（K6 切換期路徑／權限問題
+    # 若被吞掉會遮蔽到 push 才曝光）。stamp／preauth／conditional-release
+    # 三者同一權重：任一寫入失敗＝視同收尾未完成，exit 非 0（訊息與 gate 紅
+    # 可辨識，不混同）。
     if [ "${branch}" = "${base_branch}" ]; then
-      bash "${regate_sh}" stamp || true
-      bash "${lock_sh}" conditional-release || true
+      if ! bash "${regate_sh}" stamp; then
+        echo "closure: FAIL——gate 全過但 regate stamp 寫入失敗，放行憑證未落地（pre-push 擋門可能誤攔）。"
+        fail=1
+      fi
+      if ! bash "${lock_sh}" conditional-release; then
+        echo "closure: FAIL——gate 全過但收尾鎖 conditional-release 失敗，鎖狀態不明。"
+        fail=1
+      fi
     else
-      bash "${regate_sh}" preauth || true
-      echo "closure-lock: 鎖保持持有——merge --no-ff 進 ${base_branch} 後直接 push："
-      echo "  merge 樹與本輪相同 → pre-push preauth 放行（免重跑 re-gate）；"
-      echo "  樹不同（${base_branch} 已前進）→ 在 ${base_branch} 上跑 bash ${kit_root}/engines/wave-gate.sh 收尾。"
+      if ! bash "${regate_sh}" preauth; then
+        echo "closure: FAIL——gate 全過但 regate preauth 寫入失敗，放行憑證未落地。"
+        fail=1
+      else
+        echo "closure-lock: 鎖保持持有——merge --no-ff 進 ${base_branch} 後直接 push："
+        echo "  merge 樹與本輪相同 → pre-push preauth 放行（免重跑 re-gate）；"
+        echo "  樹不同（${base_branch} 已前進）→ 在 ${base_branch} 上跑 bash ${kit_root}/engines/wave-gate.sh 收尾。"
+      fi
+    fi
+    if [ "${fail}" -ne 0 ]; then
+      echo "[wave-gate:${phase}] gate 全過但收尾寫入失敗——視同未收尾，不得標波完成"
+      lock_keep_note
     fi
   fi
 else

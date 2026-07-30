@@ -36,8 +36,10 @@
 #
 # [kit 參數化] 基底分支原硬編碼 main，改讀專案宣告 `.claude/kit/kit.yaml`
 # 的 `base_branch`（缺檔／缺 key → 預設 main，行為與 dfaa 原版完全一致）。
-# wave merge 的 branch pattern（worktree-|wave/）是 kit 自身命名慣例，
-# 刻意不參數化。
+# wave merge 的 branch pattern 原硬編碼 worktree-|wave/，改讀宣告
+# `wave_branch_patterns`（空白分隔 glob，缺鍵 → 預設 "worktree-* wave/*"，
+# 逐位元組等價於原硬編碼）；宣告空值＝關閉本擋門的 wave merge 判別（明示
+# 降級秒過，見 check 段落）。詳見 kit/references/declaration-formats.md。
 
 set -u
 set -o pipefail
@@ -51,7 +53,23 @@ base_branch="$(kit_decl_get "${repo_root}/.claude/kit/kit.yaml" base_branch main
 
 cmd="${1:-check}"
 
-wave_merge_pattern='worktree-|wave/'
+wave_branch_patterns_raw="$(kit_decl_get "${repo_root}/.claude/kit/kit.yaml" wave_branch_patterns 'worktree-* wave/*')"
+
+# glob → 交替正則片段：`*` 轉 `.*`，其餘 regex metachar escape（防宣告值
+# 意外被當正則特殊字元解讀）；多 pattern（空白分隔）以 `|` 組合。空宣告
+# （wave_branch_patterns: ""）→ 組出空字串，check 段落據此秒過並明示降級，
+# 不當空正則跑（grep -E "" 會誤配每一行）。
+kit_wave_pattern_build() {
+  local patterns="${1}" p frag joined=""
+  for p in ${patterns}; do
+    frag="$(printf '%s' "${p}" | sed -e 's/[.[\^$()+{}|]/\\&/g')"
+    frag="${frag//\*/.*}"
+    if [ -z "${joined}" ]; then joined="${frag}"; else joined="${joined}|${frag}"; fi
+  done
+  printf '%s' "${joined}"
+}
+
+wave_merge_pattern="$(kit_wave_pattern_build "${wave_branch_patterns_raw}")"
 
 stamp_path() {
   local common
@@ -73,7 +91,10 @@ case "${cmd}" in
 
 stamp)
   sp="$(stamp_path)" || exit 1
-  git rev-parse HEAD > "${sp}"
+  git rev-parse HEAD > "${sp}" || {
+    echo "regate-guard: FAIL——stamp 寫入失敗 [${sp}]（放行憑證未落地）" >&2
+    exit 1
+  }
   echo "regate-guard: STAMPED（$(git rev-parse --short HEAD)）"
   exit 0
   ;;
@@ -91,7 +112,10 @@ preauth)
   {
     git rev-parse 'HEAD^{tree}'
     git rev-parse HEAD
-  } > "${pp}"
+  } > "${pp}" || {
+    echo "regate-guard: FAIL——preauth 寫入失敗 [${pp}]（預授權未落地）" >&2
+    exit 1
+  }
   echo "regate-guard: PREAUTH（tree $(git rev-parse --short 'HEAD^{tree}') @ $(git rev-parse --short HEAD)）"
   echo "  merge --no-ff 後 push：merge 樹與此樹相同即免重跑 merge re-gate（單次有效）。"
   echo "  ${base_branch} 若在此之後又前進，merge 樹必不同 → 照舊要求完整 re-gate。"
@@ -118,6 +142,11 @@ check)
     exit 0
   fi
   if ! git rev-parse --verify -q "origin/${base_branch}" >/dev/null 2>&1; then
+    exit 0
+  fi
+
+  if [ -z "${wave_branch_patterns_raw}" ]; then
+    echo "regate-guard: PASS（wave_branch_patterns 宣告為空——wave merge 判別已停用，降級秒過）"
     exit 0
   fi
 
@@ -176,7 +205,10 @@ check)
 ${offending}
 EOF
     if [ -z "${uncovered}" ]; then
-      git rev-parse HEAD > "$(stamp_path)"
+      git rev-parse HEAD > "$(stamp_path)" || {
+        echo "regate-guard: FAIL——自動補戳寫入失敗（放行憑證未落地，preauth 保留未銷毀）" >&2
+        exit 1
+      }
       rm -f "${pp}"
       echo "regate-guard: PASS（preauth 樹相符——branch 收尾 gate 已於合體樹 PASS，merge 未帶進新內容）"
       echo "  已自動補戳（$(git rev-parse --short HEAD)）並銷毀 preauth（單次有效）。"

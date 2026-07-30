@@ -125,6 +125,7 @@ assert_contains "$RH_S3OUT" "無可用 runtime" "S3 無法重生明示"
 # ═══ S4 重生（runtime-gated；SKIP 分支佔位維持斷言數）═══
 RH_RT_EXPECTED=4
 RH_RT_START=$TESTS_RUN
+RH_RT_SKIP_START=$TESTS_SKIPPED
 
 RH_RUNTIME=""
 RH_NODE_VER="$(node --version 2>/dev/null || true)"
@@ -165,12 +166,13 @@ EOF
     assert_eq "$(rh_bash_hash "$RH_S4/docs/rtm/matrix")" "$RH_S4HDR" "S4 重生後 header hash 新鮮"
     rm -rf "$RH_S4"
 else
-    echo "SKIP: rtm-session-start 重生段需 node≥23.6 或 tsx——本機皆缺（記 caveat：重生路徑未在本機驗證）"
-    while [ $((TESTS_RUN - RH_RT_START)) -lt "$RH_RT_EXPECTED" ]; do
-        assert_eq "SKIP" "SKIP" "session-start 重生 SKIP 佔位（維持斷言數恆定）"
+    # 缺 runtime：以明示 SKIP 補到與 runtime 分支同數（計入 skipped、不計入
+    # assertion 數）——記 caveat：重生路徑未在本機驗證。
+    while [ $(( (TESTS_RUN - RH_RT_START) + (TESTS_SKIPPED - RH_RT_SKIP_START) )) -lt "$RH_RT_EXPECTED" ]; do
+        kit_test_skip "rtm-session-start 重生段需 node≥23.6 或 tsx，本機皆缺——未驗"
     done
 fi
 
-assert_eq "$RH_RT_EXPECTED" "$((TESTS_RUN - RH_RT_START))" "session-start 重生段斷言數恆定守衛"
+assert_eq "$RH_RT_EXPECTED" "$(( (TESTS_RUN - RH_RT_START) + (TESTS_SKIPPED - RH_RT_SKIP_START) ))" "session-start 重生段斷言＋SKIP 數恆定守衛"
 
 rm -rf "$RH_R1" "$RH_R9" "$RH_S1" "$RH_S3" "$RH_NORT"

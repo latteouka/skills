@@ -1,4 +1,4 @@
-# wave-gate.sh — engines/wave-gate.sh 骨架合約八場景（scratch git repo + 假 stub）
+# wave-gate.sh — engines/wave-gate.sh 骨架合約十一場景（scratch git repo + 假 stub）
 #
 # ①收尾 tierA 紅 → 早退（tierB marker 不存在）且鎖保持
 # ②baseline：tierA 紅仍跑完 tierB（marker 存在）且不取鎖
@@ -8,6 +8,10 @@
 # ⑥鎖被他 branch 占 → 等待逾時紅（WAVE_LOCK_WAIT_SECONDS=2）
 # ⑦tierA.d 零 stub → exit 2 fail-closed（附帶：tierB 零 stub 允許且明示）
 # ⑧環境變數四項傳遞（stub dump 到檔案驗證）＋字典序（10- 先於 20-）
+# ⑨gate 全過但 regate stamp 寫入失敗（base branch）→ 整體 FAIL，不得被 || true 吞掉
+# ⑩gate 全過但 regate preauth 寫入失敗（非 base branch）→ 整體 FAIL
+# ⑪gate 全過、stamp 成功，但 closure-lock conditional-release 失敗 → 整體 FAIL
+#   （裁定：與 stamp／preauth 同權重，見 wave-k55-harden task-5 需求）
 
 WG_ENGINE="$KIT_ROOT/engines/wave-gate.sh"
 WG_LOCK="$KIT_ROOT/gates/merge-train/wave-closure-lock.sh"
@@ -28,6 +32,16 @@ wg_new_repo() {
 wg_stub() {
     printf '#!/usr/bin/env bash\n%s\n' "$4" > "$1/.claude/kit/gates.d/$2.d/$3"
     chmod +x "$1/.claude/kit/gates.d/$2.d/$3"
+}
+
+# wg_fail_stub — 建立一支「不管 subcommand 一律 exit 1」的假腳本，
+# 供 ⑨⑩⑪收口寫入失敗紅 case 用 WAVE_GATE_{REGATE,LOCK}_SH_OVERRIDE 注入。
+wg_fail_stub() {
+    local f
+    f="$(mktemp)"
+    printf '#!/usr/bin/env bash\necho "fake-stub: 模擬寫入失敗（arg=$1）"\nexit 1\n' > "$f"
+    chmod +x "$f"
+    echo "$f"
 }
 
 # wg_branch <repo> <name> — 從 main 開 branch 並帶一個 commit（收尾取鎖資格）
@@ -193,4 +207,46 @@ assert_contains "$WG_B_ENV" "TIER_B_ALREADY_RED=0" "⑧tierB 全綠時 TIER_B_AL
 WG_ORDER="$(cat "$WG_R8/wg-order.txt" 2>/dev/null | tr '\n' ' ')"
 assert_eq "A10 A20 " "$WG_ORDER" "⑧字典序：10- 的 marker 早於 20-"
 
-rm -rf "$WG_R1" "$WG_R2" "$WG_R3" "$WG_R4" "$WG_R5" "$WG_R6" "$WG_R7" "$WG_R8"
+# ── ⑨ 全綠但 regate stamp 寫入失敗（base branch）→ 整體 FAIL，不得吞掉 ──
+WG_R9="$(wg_new_repo)"
+wg_stub "$WG_R9" tierA 10-green.sh 'exit 0'
+FAKE_REGATE_9="$(wg_fail_stub)"
+WG_OUT="$(cd "$WG_R9" && env WAVE_GATE_REGATE_SH_OVERRIDE="$FAKE_REGATE_9" \
+    WAVE_LOCK_WAIT_SECONDS=2 WAVE_LOCK_POLL_SECONDS=1 bash "$WG_ENGINE" 收尾 2>&1)"
+WG_RC=$?
+assert_eq "1" "$WG_RC" "⑨gate 全過但 stamp 寫入失敗 → exit 1"
+assert_contains "$WG_OUT" "stamp" "⑨輸出提及 stamp"
+assert_contains "$WG_OUT" "FAIL" "⑨輸出明示 FAIL（與 gate 紅可辨識，非吞掉）"
+rm -f "$FAKE_REGATE_9"
+
+# ── ⑩ 全綠但 regate preauth 寫入失敗（非 base branch）→ 整體 FAIL ──────
+WG_R10="$(wg_new_repo)"
+wg_stub "$WG_R10" tierA 10-green.sh 'exit 0'
+wg_branch "$WG_R10" worktree-wave-j
+FAKE_REGATE_10="$(wg_fail_stub)"
+WG_OUT="$(cd "$WG_R10" && env WAVE_GATE_REGATE_SH_OVERRIDE="$FAKE_REGATE_10" \
+    WAVE_LOCK_WAIT_SECONDS=2 WAVE_LOCK_POLL_SECONDS=1 bash "$WG_ENGINE" 收尾 2>&1)"
+WG_RC=$?
+assert_eq "1" "$WG_RC" "⑩gate 全過但 preauth 寫入失敗 → exit 1"
+assert_contains "$WG_OUT" "preauth" "⑩輸出提及 preauth"
+assert_contains "$WG_OUT" "FAIL" "⑩輸出明示 FAIL"
+rm -f "$FAKE_REGATE_10"
+
+# ── ⑪ 全綠、stamp 成功，但 conditional-release 失敗 → 整體 FAIL（同權重裁定） ──
+WG_R11="$(wg_new_repo)"
+wg_stub "$WG_R11" tierA 10-green.sh 'exit 0'
+FAKE_LOCK_11="$(wg_fail_stub)"
+WG_OUT="$(cd "$WG_R11" && env WAVE_GATE_LOCK_SH_OVERRIDE="$FAKE_LOCK_11" \
+    WAVE_LOCK_WAIT_SECONDS=2 WAVE_LOCK_POLL_SECONDS=1 bash "$WG_ENGINE" 收尾 2>&1)"
+WG_RC=$?
+assert_eq "1" "$WG_RC" "⑪gate 全過、stamp 成功，但 conditional-release 失敗 → exit 1"
+assert_contains "$WG_OUT" "conditional-release" "⑪輸出提及 conditional-release"
+if [ -f "$WG_R11/.git/wave-regate-pass" ]; then
+    assert_eq "yes" "yes" "⑪stamp 仍照常寫入（獨立於鎖釋放失敗）"
+else
+    assert_eq "stamp 檔存在" "不存在" "⑪stamp 仍照常寫入（獨立於鎖釋放失敗）"
+fi
+rm -f "$FAKE_LOCK_11"
+
+rm -rf "$WG_R1" "$WG_R2" "$WG_R3" "$WG_R4" "$WG_R5" "$WG_R6" "$WG_R7" "$WG_R8" \
+    "$WG_R9" "$WG_R10" "$WG_R11"

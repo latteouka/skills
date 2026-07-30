@@ -26,8 +26,11 @@
 # 全部用 ${var} 形式（macOS bash 3.2 + set -u 契約，同族 hook 一致）。
 #
 # [kit 參數化] 基底分支原硬編碼 main，改讀專案宣告 `.claude/kit/kit.yaml`
-# 的 `base_branch`（預設 main）。wave id 抽取 pattern（worktree-|wave/）是
-# kit 自身命名慣例，不參數化。其餘逐位元組保留。
+# 的 `base_branch`（預設 main）。wave id 抽取 pattern 原硬編碼
+# worktree-|wave/，改讀宣告 `wave_branch_patterns`（空白分隔 glob，缺鍵 →
+# 預設 "worktree-* wave/*"，逐位元組等價於原硬編碼；只有以 `*` 結尾的
+# pattern 能算出前綴供 id 抽取，其餘 token 對本檔是 no-op）。宣告空值＝
+# 關閉本擋門的 wave merge 判別（明示降級秒過）。其餘逐位元組保留。
 
 set -u
 set -o pipefail
@@ -38,6 +41,37 @@ kit_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 base_branch="$(kit_decl_get "${repo_root}/.claude/kit/kit.yaml" base_branch main)"
+wave_branch_patterns="$(kit_decl_get "${repo_root}/.claude/kit/kit.yaml" wave_branch_patterns 'worktree-* wave/*')"
+
+# wave id 抽取正則：只消費以 `*` 結尾的 pattern（前綴＋萬用字元＝可變 id 的
+# glob 慣例），無 `*` 的 token 無法定義變動段落，跳過（不影響其餘 token）。
+kit_wave_id_extract_regex() {
+  local patterns="${1}" p prefix esc joined=""
+  for p in ${patterns}; do
+    case "${p}" in
+      *'*') prefix="${p%\*}" ;;
+      *) continue ;;
+    esac
+    [ -n "${prefix}" ] || continue
+    esc="$(printf '%s' "${prefix}" | sed -e 's/[.[\^$()+{}|]/\\&/g')"
+    if [ -z "${joined}" ]; then joined="${esc}[a-z0-9][a-z0-9-]*"
+    else joined="${joined}|${esc}[a-z0-9][a-z0-9-]*"; fi
+  done
+  printf '%s' "${joined}"
+}
+
+# 對應的前綴去除 sed 表達式，逐行輸出供呼叫端組 -e 陣列。
+kit_wave_id_strip_exprs() {
+  local patterns="${1}" p prefix
+  for p in ${patterns}; do
+    case "${p}" in
+      *'*') prefix="${p%\*}" ;;
+      *) continue ;;
+    esac
+    [ -n "${prefix}" ] || continue
+    printf 's|^%s||\n' "${prefix}"
+  done
+}
 
 cmd="${1:-check}"
 
@@ -52,9 +86,26 @@ check)
     exit 0
   fi
 
+  if [ -z "${wave_branch_patterns}" ]; then
+    echo "close-guard: PASS（wave_branch_patterns 宣告為空——wave merge 判別已停用，降級秒過）"
+    exit 0
+  fi
+
+  id_extract_re="$(kit_wave_id_extract_regex "${wave_branch_patterns}")"
+  if [ -z "${id_extract_re}" ]; then
+    echo "close-guard: PASS（wave_branch_patterns 無可用前綴 pattern——判別已停用）"
+    exit 0
+  fi
+
+  sed_args=()
+  while IFS= read -r expr; do
+    [ -n "${expr}" ] || continue
+    sed_args+=(-e "${expr}")
+  done < <(kit_wave_id_strip_exprs "${wave_branch_patterns}")
+
   ids="$(git log "origin/${base_branch}..HEAD" --merges --format='%s' 2>/dev/null \
-    | grep -oE 'worktree-[a-z0-9][a-z0-9-]*|wave/[a-z0-9][a-z0-9-]*' \
-    | sed 's|^worktree-||; s|^wave/||' | sort -u || true)"
+    | grep -oE "${id_extract_re}" \
+    | sed "${sed_args[@]}" | sort -u || true)"
   if [ -z "${ids}" ]; then
     echo "close-guard: PASS（push range 無 wave merge）"
     exit 0

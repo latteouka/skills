@@ -108,7 +108,11 @@ function unquoteValue(raw: string): string {
   return val;
 }
 
-/** kit_decl_get 的 TS 對照：讀 flat-key YAML 的 top-level key，缺檔/缺 key/空值回 default。 */
+/**
+ * kit_decl_get 的 TS 對照（兩態語意，與 lib/common.sh 同構，改動必兩側同改）：
+ * key 存在但值為空（`key: ""` 或 `key:` 後無值）→ 回空字串（欄位留空＝降級，
+ * 不吃 default）；key 完全缺席／檔案缺失 → 回 default（fail-open）。
+ */
 function declGet(file: string, key: string, dflt: string): string {
   let text: string;
   try {
@@ -119,8 +123,7 @@ function declGet(file: string, key: string, dflt: string): string {
   for (const line of text.split("\n")) {
     const m = line.match(new RegExp(`^${key}:[ \\t]*(.*)$`));
     if (m) {
-      const val = unquoteValue(m[1]);
-      return val !== "" ? val : dflt;
+      return unquoteValue(m[1]);
     }
   }
   return dflt;

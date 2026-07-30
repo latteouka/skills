@@ -31,7 +31,12 @@
 # [kit 參數化] ①基底分支原硬編碼 main，改讀專案宣告 `.claude/kit/kit.yaml`
 # 的 `base_branch`（預設 main）②docs 豁免 pattern（`*.md|.claude/dev/*`）
 # 可由 kit.yaml `lock_docs_exempt` 覆寫（`|` 分隔多個 glob；無宣告時預設
-# 保留 dfaa 原值）。worktree-* branch pattern 是 kit 自身命名慣例，不參數化。
+# 保留 dfaa 原值）③worktree merge 偵測的 branch glob 原硬編碼
+# refs/heads/worktree-*，改讀 `wave_branch_patterns`（空白分隔多 glob；
+# 缺鍵 → 預設 "worktree-*"，與本檔原行為逐位元組相同——注意此檔歷史預設
+# 不含 wave/*，與 wave-regate-guard／wave-close-guard 的預設不同，故各自
+# 傳入各自的歷史預設值，宣告值一旦顯式給出則三檔共用同一份宣告）。宣告
+# 空值＝關閉本段偵測（明示降級，該次 merge 視為日常 merge 不擋）。
 
 set -u -o pipefail
 
@@ -147,6 +152,10 @@ kit_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 base_branch="$(kit_decl_get "${repo_root}/.claude/kit/kit.yaml" base_branch main)"
 lock_docs_exempt="$(kit_decl_get "${repo_root}/.claude/kit/kit.yaml" lock_docs_exempt '*.md|.claude/dev/*')"
+# 本檔歷史預設只含 worktree-*（不含 wave/*——與另兩支 merge-subject 判別
+# 的預設不同，見上方 [kit 參數化] 註記）；宣告值一旦顯式給出即與其他檔
+# 共用同一組 pattern。
+wave_branch_patterns="$(kit_decl_get "${repo_root}/.claude/kit/kit.yaml" wave_branch_patterns 'worktree-*')"
 
 # docs 豁免比對：宣告值以 `|` 分隔多個 glob，逐一 case 比對。
 # for 展開時關 glob（set -f）防 pattern 被 cwd 檔名意外展開；case 比對
@@ -189,15 +198,21 @@ fi
 # ── 🤖-1 worktree merge 偵測（lock-hardening 缺陷 A）────────────
 merge_head_path="$(git rev-parse --git-path MERGE_HEAD)"
 merge_worktree_branch=""
-if [ -f "${merge_head_path}" ]; then
+if [ -f "${merge_head_path}" ] && [ -n "${wave_branch_patterns}" ]; then
   merge_head_val="$(cat "${merge_head_path}")"
+  ref_patterns=()
+  for p in ${wave_branch_patterns}; do
+    ref_patterns+=("refs/heads/${p}")
+  done
   while IFS= read -r ref; do
     ref_tip="$(git rev-parse --verify -q "${ref}" || true)"
     if [ -n "${ref_tip}" ] && [ "${ref_tip}" = "${merge_head_val}" ]; then
       merge_worktree_branch="${ref}"
       break
     fi
-  done < <(git for-each-ref --format='%(refname:short)' 'refs/heads/worktree-*')
+  done < <(git for-each-ref --format='%(refname:short)' "${ref_patterns[@]}")
+elif [ -f "${merge_head_path}" ]; then
+  echo "closure-lock-guard: wave_branch_patterns 宣告為空——worktree merge 偵測已停用（降級，本次 merge 視為日常 merge 不擋）。"
 fi
 
 if [ -n "${merge_worktree_branch}" ]; then

@@ -154,12 +154,14 @@ kit_root: "/Users/x/projects/skills/kit"
 modules: "intake backlog rtm"   # 已安裝模組
 baseline_file: quality-baseline.json
 empty_field: ""
+bare_empty:
 EOF
 assert_eq "/Users/x/projects/skills/kit" "$(kit_decl_get "$DECL_SANDBOX/kit.yaml" kit_root '')" "decl 引號值去引號"
 assert_eq "intake backlog rtm" "$(kit_decl_get "$DECL_SANDBOX/kit.yaml" modules '')" "decl 引號值含空格＋行內註解不截斷"
 assert_eq "quality-baseline.json" "$(kit_decl_get "$DECL_SANDBOX/kit.yaml" baseline_file '')" "decl 裸值"
 assert_eq "DEF" "$(kit_decl_get "$DECL_SANDBOX/kit.yaml" not_there 'DEF')" "decl 缺 key 回 default"
-assert_eq "DEF" "$(kit_decl_get "$DECL_SANDBOX/kit.yaml" empty_field 'DEF')" "decl 空引號值回 default（欄位留空＝降級）"
+assert_eq "" "$(kit_decl_get "$DECL_SANDBOX/kit.yaml" empty_field 'DEF')" "decl key 存在但空引號值→回空字串（欄位留空＝降級，不吃 default）"
+assert_eq "" "$(kit_decl_get "$DECL_SANDBOX/kit.yaml" bare_empty 'DEF')" "decl key 存在但無值（key: 後空白）→回空字串（降級）"
 assert_eq "DEF" "$(kit_decl_get "$DECL_SANDBOX/no-such-file.yaml" kit_root 'DEF')" "decl 缺檔 fail-open 回 default"
 
 # --- [K1] kit_manifest_lookup：8 欄 TSV 欄 1 exact match
