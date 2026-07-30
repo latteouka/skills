@@ -181,3 +181,40 @@ Subagent-Driven 的心跳 prompt——Inline 執行、compaction 後、下一波
   （2026-07-28 dfaa 實見）。註記放檔頭歷史指標區，每批 triage 更新為新最大值
 - 輸出處理摘要：新增 N 筆、併入 M 筆、dropped K 筆、⚠️ 待確認 J 筆
 - **若 config 已設 `spec_check` 且本批有任何 `type: SPEC_CHANGE` 或 `NEW` 的項目**（會動到規格層），輸出提醒使用者執行該指令驗證規格檔一致性。若 `spec_check` 為空則跳過此提醒。
+
+## 7. 逃逸歸因 enum（`--from` 回饋批次波 triage 專用——與上述 INB/backlog 判斷樹是不同機制，不套用步驟 1–6）
+
+> 依據：存在性只量「防線有沒有蓋到」，有效性要量「防線真的攔到沒有」。逃逸缺陷（客戶回報
+> bug／驗收台 issue）能歸因到「本該攔住卻沒攔住」的具體防線，是下一輪 roadmap 排波優先序的
+> 直接證據；欄位成本低（每 issue 約 10 秒），換到的是把「感覺哪裡弱」變成可累積、可統計的事實。
+
+**填寫時機**：`/wave --from` 回饋批次波 Phase 2 掃描／triage 每筆項目時，在 triage 表加一欄
+「該攔防線」——搭現有 triage 步驟的便車，不另立獨立流程。
+
+**值域（closed enum，六選一，不可空白、不可複選）**：
+
+| 值 | 意涵 |
+|---|---|
+| `lint` | ESLint custom rule／ratchet counter 本該擋下 |
+| `gate` | pre-commit／pre-push hook（`gates.d/` 或專案既有 gate）本該擋下 |
+| `quality-check` | 資料正確性對帳機制（db-count／db-assertion／db-ratio／truth-match 類）本該抓到 |
+| `E2E` | acceptance E2E 本該覆蓋這條 user flow，但沒對應 spec 或 spec 沒測到這個分支 |
+| `flow-check` | 流程／狀態機／查詢行為對帳機制本該對帳到這個查詢／流程行為 |
+| `none` | 目前沒有任何防線覆蓋此類問題——**唯一會直接產生新工作項的值** |
+
+- **quality-check vs flow-check 難分時**：資料正確性（欄位值、計數、聚合）算 `quality-check`；
+  流程／狀態機／查詢行為對帳算 `flow-check`。真的模稜兩可 → 歸 `quality-check`（既有覆蓋率
+  較高，避免同一逃逸被雙重計數）
+- **選值原則**：選「設計上原本最應該攔住」的第一道防線，不是「理論上也可能攔到」的全部——
+  其餘防線的關聯落差在 triage 表 notes 欄補述，不塞進本欄
+- **`none` 的額外要求**：值為 `none` 時，notes 必須附「新防線候選」的具體方案雛形（哪類
+  rule／gate／check、大致怎麼做），否則不算完成歸因——避免 `none` 變成不了了之的垃圾桶分類
+- **消費者**：若專案已裝 `governance-health` 模組，彙整跨波次逃逸歸因分布 → 下一輪 roadmap
+  排波優先序輸入（哪道防線漏最多＝下一波優先修的防線）
+- **明確不做**：不建攔截即時留痕 log（想不出消費者前不建）；本欄只在事後 triage 時人工標記
+  一次，不追蹤攔截當下的即時行為
+
+> 各專案的具體防線名稱不同（`gate` 對應各自的 `gates.d/` 或既有 pre-commit hook；
+> `quality-check`／`flow-check` 對應各自的資料／流程對帳機制），但 enum 值域本身通用。
+> 各專案的 quality-gates 文件應引用本節作為 source of truth，只在本節之外補充該專案的
+> 具體防線名稱對應表，不重複定義值域與規則本身。

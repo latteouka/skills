@@ -6,6 +6,12 @@ spec_layer: ""
 # 專案的規格閘門指令（選填，triage 後可據此提醒）
 spec_check: ""
 
+# 部署／現場作業 SSOT（capture.sh 命中 ops_keywords 時提示分流至此，不入 inbox）。
+# 留空＝該提示降級（capture.sh 照舊只寫 inbox）。骨架模板：templates/ops/DEPLOY-MEMO.md
+# （複製到 ops_memo 指定路徑後依專案客製；模板本身不含專案資料）。
+ops_memo: ""
+ops_keywords: ""
+
 hot_zone_limit: 20      # .claude/dev/ 熱區 .md 檔數上限
 inbox_alert: 8          # 未整理筆數告警線
 stale_days: 60          # backlog ready 項多久算 stale
