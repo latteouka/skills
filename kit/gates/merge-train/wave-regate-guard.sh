@@ -73,7 +73,10 @@ case "${cmd}" in
 
 stamp)
   sp="$(stamp_path)" || exit 1
-  git rev-parse HEAD > "${sp}"
+  git rev-parse HEAD > "${sp}" || {
+    echo "regate-guard: FAIL——stamp 寫入失敗 [${sp}]（放行憑證未落地）" >&2
+    exit 1
+  }
   echo "regate-guard: STAMPED（$(git rev-parse --short HEAD)）"
   exit 0
   ;;
@@ -91,7 +94,10 @@ preauth)
   {
     git rev-parse 'HEAD^{tree}'
     git rev-parse HEAD
-  } > "${pp}"
+  } > "${pp}" || {
+    echo "regate-guard: FAIL——preauth 寫入失敗 [${pp}]（預授權未落地）" >&2
+    exit 1
+  }
   echo "regate-guard: PREAUTH（tree $(git rev-parse --short 'HEAD^{tree}') @ $(git rev-parse --short HEAD)）"
   echo "  merge --no-ff 後 push：merge 樹與此樹相同即免重跑 merge re-gate（單次有效）。"
   echo "  ${base_branch} 若在此之後又前進，merge 樹必不同 → 照舊要求完整 re-gate。"
