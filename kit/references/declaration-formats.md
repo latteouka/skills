@@ -1,6 +1,6 @@
 # Kit 宣告檔規格
 
-專案側宣告全部住 `<project>/.claude/kit/`（進版控）。引擎住 kit、專案只放宣告——kit 更新全專案立即受益。可執行邏輯（counter、gate stub）一律是版控內可 review 的 bash 檔，不從資料檔執行命令字串（沿用 ratchet 既有設計裁定）。
+專案側宣告全部住 `<project>/.claude/kit/`（進版控）。引擎住 kit、專案只放宣告——kit 更新全專案立即受益。可執行邏輯（counter、gate stub）一律是版控內可 review 的 bash 檔，不從資料檔執行命令字串（沿用 ratchet 既有設計裁定）。唯一受信任例外：`kit.yaml` 的 `merge_prep_cmd`（wave-merge-prep.sh 以 `bash -c` 執行宣告字串）——宣告者＝repo 擁有者，kit.yaml 進版控可 review，與 hook 腳本同信任層級。
 
 ## kit.yaml
 
@@ -74,9 +74,21 @@ gate 自測 fixture。`canary.d/<gate>/` 契約：
 - `git` 選配 marker 檔——存在＝引擎先建 scratch git repo + seed 字面名 origin/main 分支再複製 fixture
 - `setup.sh` 選配——git 拓撲建構（scratch 內、fixture 複製後、run.sh 前執行）
 
-引擎（`engines/canary.sh`）逐 gate 三斷言：violation 必紅、clean 必綠、`inspected:N` N>0——缺一即 FAIL（防「gate 跑了 exit 0 但檢查 0 個檔」）；canary.d 缺失或零 gate = exit 2 fail-closed。
+引擎（`engines/canary.sh`）逐 gate 三斷言：violation 必紅、clean 必綠、`inspected:N` N>0——缺一即 FAIL（防「gate 跑了 exit 0 但檢查 0 個檔」）；三斷言之 3 對 violation 與 clean 兩分支**都**驗（K5.5 修：clean 分支若無 `inspected:N` 或 `inspected:0`，同樣 FAIL——否則「clean 跑了 0 個檢查」與「clean 真通過」在輸出上無法區分）；canary.d 缺失或零 gate = exit 2 fail-closed。
+
+### gates.d↔canary.d 對帳（K5.5 GPT §4.3）
+
+canary.d 只列舉自己已有的目錄——一支 `gates.d` 有 stub 但沒人補 canary fixture 的 gate，永遠不會被三斷言測到，「漏測」與「測過全綠」在引擎輸出上長得一樣。`engines/canary.sh` 反過來，以 `gates.d/tierA.d/` 與 `gates.d/tierB.d/` 的 stub 清單為準逐一核對 canary.d 是否有對應 fixture（跑在 canary.d 存在性檢查之後、三斷言主迴圈之前）：
+
+- **命名對應規則**：`gates.d/tierA.d/NN-<name>.sh` → `canary.d/tierA-<name>/`；`gates.d/tierB.d/NN-<name>.sh` → `canary.d/tierB-<name>/`（去字典序 `NN-` 前綴與 `.sh` 副檔名，前綴 tier 名避免 tierA／tierB 同名 stub 撞名）。推導邏輯見 `lib/canary-harness.sh` 的 `canary_stub_gate_name`。
+- **缺 fixture 且未豁免 → FAIL**：對帳失敗時引擎逐一列出缺 fixture 的 gate 名並 `exit 1`（與 canary.d 整體缺失的 `exit 2` 區分——對帳失敗代表「知道要測什麼但沒測」，比「完全沒宣告」更明確可行動）。
+- **豁免必須逐 gate 明示（fail-closed）**：無法立即補 fixture 的 gate，放 `canary.d/<gate>.skip` marker 檔（如 `canary.d/tierB-bar.skip`），**內容必須非空白**（一行理由）。理由留空＝無效豁免，視同未豁免照樣 FAIL——不許用空檔繞過對帳。
+- **`gates.d` 整體不存在**（專案未裝 wave-gate 模組、只用 canary 跑其他自訂 gate）→ 對帳印 `SKIP(gates.d↔canary.d 對帳)` 明示並略過，不誤殺。
+- 對帳邏輯抽成 `lib/canary-harness.sh` 的 `canary_reconcile_gates <decl_dir>`（可獨立呼叫，供未來 kit-doctor 等消費者重用）。
 
 ## health.d/
+
+> **K7 未交付**——本節為規格預告，repo 內尚無對應引擎。
 
 governance-health 數據源節，每節一檔 `NN-*.sh`，stdout 即該節報告內容。引擎提供 11 節骨架與「結論三行」硬性要求；單一數據源失敗降級 N/A 不中斷（刻意不 `set -e`）。
 

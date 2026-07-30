@@ -47,6 +47,18 @@ if [ ! -d "${CANARY_D}" ]; then
     exit 2
 fi
 
+# --- gates.d↔canary.d 對帳（K5.5 GPT §4.3）：canary.d 只列舉自己有的目錄，
+# 一支 gates.d stub 沒人補 fixture 就永遠測不到。逐 stub 反查 canary.d，
+# 缺且未 .skip 豁免 → FAIL 列名 exit 1；gates.d 不存在 → SKIP 不誤殺。
+RECONCILE_OUT="$(canary_reconcile_gates "${DECL_DIR}")"
+RECONCILE_RC=$?
+[ -z "${RECONCILE_OUT}" ] || echo "${RECONCILE_OUT}"
+if [ "${RECONCILE_RC}" -ne 0 ]; then
+    echo "" >&2
+    echo "FAIL(closed): gates.d↔canary.d 對帳失敗——上列 gate 缺 canary.d fixture 且未豁免" >&2
+    exit 1
+fi
+
 TMP_ROOT="$(canary_tmp_init kit-canary)" || exit 1
 cleanup() { rm -rf "${TMP_ROOT}"; }
 trap cleanup EXIT
@@ -105,6 +117,15 @@ for gate_dir in "${CANARY_D}"/*/; do
                     gate_ok=1
                 else
                     echo "  ✓ ${gate_name}: clean:pass"
+                fi
+                inspected="$(canary_extract_inspected "${out}")" || {
+                    echo "  ✗ ${gate_name}: clean inspected:UNAVAILABLE(輸出無 inspected:N)——clean 假通過母題（跑了 0 個檢查與真通過無法區分）"
+                    gate_ok=1
+                    inspected=""
+                }
+                if [ -n "${inspected}" ] && [ "${inspected}" -eq 0 ] 2>/dev/null; then
+                    echo "  ✗ ${gate_name}: clean inspected:0——clean 假通過母題（跑了 0 個檢查與真通過無法區分）"
+                    gate_ok=1
                 fi
             fi
         done

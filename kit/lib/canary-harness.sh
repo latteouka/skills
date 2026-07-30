@@ -129,6 +129,73 @@ canary_extract_inspected() {
     return 0
 }
 
+# canary_stub_gate_name <tier> <stub_path> — gates.d stub → canary.d fixture
+# 名稱推導：gates.d/<tier>.d/NN-<name>.sh → canary.d/<tier>-<name>/
+# （去 NN- 字典序前綴與 .sh 副檔名，前綴 tier 避免 tierA/tierB 同名 stub 撞名）。
+canary_stub_gate_name() {
+    local tier="${1}" stub="${2}" base name
+    base="$(basename "${stub}")"
+    name="${base%.sh}"
+    name="$(printf '%s\n' "${name}" | sed -n 's/^[0-9][0-9]*-//p')"
+    [ -n "${name}" ] || name="${base%.sh}"
+    printf '%s-%s' "${tier}" "${name}"
+}
+
+# canary_reconcile_gates <decl_dir> — gates.d↔canary.d 對帳（K5.5 GPT §4.3）。
+#
+# 母題：canary.d 只列舉自己有的目錄，一支 gates.d 有 stub 但沒人補 canary
+# fixture 的 gate 永遠不會被三斷言測到——「漏測」與「測過全綠」在引擎輸出
+# 上長得一樣。本函式反過來，以 gates.d 的 stub 清單為準逐一核對 canary.d
+# 是否有對應 fixture。
+#
+# 命名對應規則：gates.d/tierA.d/NN-<name>.sh → canary.d/tierA-<name>/；
+# tierB.d 同理 → canary.d/tierB-<name>/（見 canary_stub_gate_name）。
+#
+# 豁免契約：無法補 fixture 的 gate 需逐一放 canary.d/<gate>.skip marker
+# 檔，內容必須非空白（理由一行）。理由留空＝無效豁免，視同未豁免照樣 FAIL
+# （fail-closed——不許用空檔繞過對帳）。
+#
+# gates.d 整體不存在（專案未裝 wave-gate 模組，只用 canary 跑其他自訂
+# gate）→ 印 SKIP 明示、return 0，不誤殺。
+#
+# stdout：逐項 ✗/⚠ 訊息（呼叫端自行決定要不要轉印）。
+# return：0＝全數有 fixture 或已豁免（或 gates.d 不存在）；1＝至少一項缺
+# fixture 且未豁免（呼叫端據此列 FAIL、exit 1）。
+canary_reconcile_gates() {
+    local decl_dir="${1}" gates_d canary_d tier tier_dir stub gate_name skip_marker reason failed=0
+    gates_d="${decl_dir}/gates.d"
+    canary_d="${decl_dir}/canary.d"
+    if [ ! -d "${gates_d}" ]; then
+        echo "SKIP(gates.d↔canary.d 對帳): gates.d 不存在 [${gates_d}]——本專案未用 wave-gate 模組"
+        return 0
+    fi
+    for tier in tierA tierB; do
+        tier_dir="${gates_d}/${tier}.d"
+        [ -d "${tier_dir}" ] || continue
+        for stub in "${tier_dir}"/*.sh; do
+            [ -f "${stub}" ] || continue
+            gate_name="$(canary_stub_gate_name "${tier}" "${stub}")"
+            if [ -d "${canary_d}/${gate_name}" ]; then
+                continue
+            fi
+            skip_marker="${canary_d}/${gate_name}.skip"
+            if [ -f "${skip_marker}" ]; then
+                reason="$(tr -d '[:space:]' < "${skip_marker}" 2>/dev/null)"
+                if [ -n "${reason}" ]; then
+                    echo "  ⚠ 對帳: ${gate_name} 已豁免（.skip 理由: $(cat "${skip_marker}")）"
+                    continue
+                fi
+                echo "  ✗ 對帳: ${gate_name} 缺 canary.d fixture，.skip 理由為空（無效豁免）[${skip_marker}]"
+                failed=1
+                continue
+            fi
+            echo "  ✗ 對帳: gates.d stub [${stub}] 缺對應 canary.d fixture [${canary_d}/${gate_name}]（未豁免）"
+            failed=1
+        done
+    done
+    return "${failed}"
+}
+
 # canary_run_gate <name> <gate_cmd> <violation_dir> <clean_dir> [tmp_root]
 # 三斷言一次跑完。gate_cmd 以「fixture 複製出的 scratch 目錄」為 cwd 執行
 # （eval 執行，可含參數）。回 0=三斷言全過；非 0=至少一敗（已印明細）。
