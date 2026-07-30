@@ -143,15 +143,28 @@ const FALLBACK_BASES = splitWs(declGet(KIT_YAML, "impl_path_bases", ".")).map((b
 const KNOWN_NON_PATH_TOKENS = new Set(splitWs(declGet(KIT_YAML, "rtm_nonpath_tokens", "Next.js Node.js")));
 
 // --- js-yaml：createRequire 從目標專案 node_modules 解析（kit 零 node 依賴）---
+// monorepo 消費者（如 dfaa pnpm workspace）js-yaml 常只裝在 app workspace，
+// repo 根無頂層 symlink——解析基準依序試 ROOT → ROOT/<app_workspace>（宣告，
+// 缺鍵不試第二基準）。上游 dfaa rtm-check 本就從 apps/web 執行，此為漏掉的
+// 參數化（K6 讀側首啟實踩）。
 
-let yamlLoad: (s: string) => unknown;
-try {
-  const projectRequire = createRequire(pathToFileURL(path.join(ROOT, "package.json")));
-  const yaml = projectRequire("js-yaml") as { load: (s: string) => unknown };
-  yamlLoad = yaml.load;
-} catch {
+const APP_WORKSPACE = declGet(KIT_YAML, "app_workspace", "");
+const YAML_RESOLVE_BASES = [ROOT, ...(APP_WORKSPACE ? [path.join(ROOT, APP_WORKSPACE)] : [])];
+
+let yamlLoad: ((s: string) => unknown) | undefined;
+for (const base of YAML_RESOLVE_BASES) {
+  try {
+    const projectRequire = createRequire(pathToFileURL(path.join(base, "package.json")));
+    const yaml = projectRequire("js-yaml") as { load: (s: string) => unknown };
+    yamlLoad = yaml.load;
+    break;
+  } catch {
+    // 換下一個基準
+  }
+}
+if (!yamlLoad) {
   console.error(
-    `rtm-check: 無法從目標專案解析 js-yaml（解析基準 ${path.join(ROOT, "package.json")}）——` +
+    `rtm-check: 無法從目標專案解析 js-yaml（解析基準依序：${YAML_RESOLVE_BASES.map((b) => path.join(b, "package.json")).join("、")}）——` +
       "rtm 模組要求專案自備 js-yaml，請在專案安裝後重跑",
   );
   process.exit(1);
