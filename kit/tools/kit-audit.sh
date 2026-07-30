@@ -120,7 +120,7 @@ fi
 # --- 無帳掃描（受管目錄 vs ledger 集合差）
 SCRATCH="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH"' EXIT
-(cd "$KIT_ROOT" && find engines gates tools hooks scripts lib installers -name '*.sh' -type f 2>/dev/null | sort) > "$SCRATCH/actual.txt"
+(cd "$KIT_ROOT" && find engines gates tools hooks scripts lib installers \( -name '*.sh' -o -name '*.ts' \) -type f 2>/dev/null | sort) > "$SCRATCH/actual.txt"
 awk -F'\t' '!/^#/ && !/^$/ { p=$1; sub(/#.*$/, "", p); print p }' "$MANIFEST" | sort -u > "$SCRATCH/ledger.txt"
 UNLEDGERED="$(comm -23 "$SCRATCH/actual.txt" "$SCRATCH/ledger.txt")"
 

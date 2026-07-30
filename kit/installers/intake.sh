@@ -6,6 +6,12 @@
 set -u
 
 KIT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+case "${KIT_ROOT}" in */.claude/worktrees/*)
+    if [ "${KIT_INIT_ALLOW_WORKTREE:-0}" != "1" ]; then
+        echo "錯誤：不可從 worktree 安裝（KIT_ROOT=${KIT_ROOT} 會隨 worktree 清除失效）。請從主 checkout 執行。" >&2
+        exit 1
+    fi ;;
+esac
 . "${KIT_ROOT}/lib/common.sh" 2>/dev/null || { echo "找不到 lib/common.sh"; exit 1; }
 
 NONINTERACTIVE=false
@@ -23,8 +29,8 @@ settings="${root}/.claude/settings.json"
 mkdir -p "${root}/.claude"
 [ -f "$settings" ] || printf '{}\n' > "$settings"
 
-if ! jq empty "$settings" >/dev/null 2>&1; then
-    echo "錯誤：${settings} 不是合法 JSON，中止安裝（未做任何寫入）。"
+if ! jq -e 'type=="object"' "$settings" >/dev/null 2>&1; then
+    echo "錯誤：${settings} 不是合法 JSON object（空檔/array 皆拒），中止安裝（未做任何寫入）。"
     exit 1
 fi
 
@@ -95,7 +101,9 @@ else
       | .hooks.Stop += [{
           hooks: [{ type: "command", command: ($k + "/no-midwave-questions.sh"), timeout: 10 }]
         }]
-    ' "$settings" > "$tmp" && mv "$tmp" "$settings"
+    ' "$settings" > "$tmp" || { echo "錯誤：jq merge 失敗，settings 未變更。" >&2; rm -f "$tmp"; exit 1; }
+    jq -e 'type=="object"' "$tmp" >/dev/null 2>&1 || { echo "錯誤：merge 產物非 JSON object，拒絕覆寫。" >&2; rm -f "$tmp"; exit 1; }
+    mv "$tmp" "$settings"
     created="${created} settings.json(5個hook)"
 fi
 

@@ -37,6 +37,21 @@ kit_scaffold_file() {
     fi
 }
 
+# kit_guard_worktree_install — KIT_ROOT 在 worktree 內＝路徑會隨清除失效（hook 指死路徑
+# 鎖死全 repo commit/push）。拒裝；測試用 KIT_INIT_ALLOW_WORKTREE=1 豁免。
+kit_guard_worktree_install() {
+    local kr="$1"
+    case "$kr" in
+        */.claude/worktrees/*)
+            if [ "${KIT_INIT_ALLOW_WORKTREE:-0}" != "1" ]; then
+                echo "錯誤：不可從 worktree 安裝（KIT_ROOT=${kr} 會隨 worktree 清除失效）。請從主 checkout 執行。" >&2
+                return 1
+            fi
+            ;;
+    esac
+    return 0
+}
+
 # kit_module_settings_merge <settings.json> <sentinel> <jq-filter>
 # settings.json 合法性驗證 → sentinel 已存在則 skip（冪等）→ 備份 → jq merge 原子寫入。
 # sentinel＝merge 後必然出現在檔內的字串（如 hook 指令路徑），用它判斷「已安裝」。
@@ -45,17 +60,25 @@ kit_module_settings_merge() {
     local settings="$1" sentinel="$2" filter="$3" tmp
     command -v jq >/dev/null 2>&1 || { echo "錯誤：settings merge 需要 jq。" >&2; return 1; }
     [ -f "$settings" ] || printf '{}\n' > "$settings"
-    if ! jq empty "$settings" >/dev/null 2>&1; then
-        echo "錯誤：${settings} 不是合法 JSON，不做 merge。" >&2
+    if ! jq -e 'type=="object"' "$settings" >/dev/null 2>&1; then
+        echo "錯誤：${settings} 不是合法 JSON object（空檔/array/字串皆拒），不做 merge。" >&2
         return 1
     fi
     if grep -qF "$sentinel" "$settings" 2>/dev/null; then
         KIT_MODULE_SKIPPED="${KIT_MODULE_SKIPPED} settings.json(已安裝)"
         return 0
     fi
-    cp "$settings" "${settings}.bak-$(date '+%Y%m%d%H%M%S')"
-    tmp="$(mktemp)"
-    jq "$filter" "$settings" > "$tmp" && mv "$tmp" "$settings"
+    cp "$settings" "${settings}.bak-$(date '+%Y%m%d%H%M%S').$$" || { echo "錯誤：settings 備份失敗，不做 merge。" >&2; return 1; }
+    tmp="${settings}.tmp.$$"
+    if ! jq "$filter" "$settings" > "$tmp" 2>/dev/null; then
+        echo "錯誤：jq merge 失敗（filter 或磁碟問題），settings 未變更。" >&2
+        rm -f "$tmp"; return 1
+    fi
+    if ! jq -e 'type=="object"' "$tmp" >/dev/null 2>&1; then
+        echo "錯誤：merge 產物不是合法 JSON object，拒絕覆寫。" >&2
+        rm -f "$tmp"; return 1
+    fi
+    mv "$tmp" "$settings" || { rm -f "$tmp"; return 1; }
     KIT_MODULE_CREATED="${KIT_MODULE_CREATED} settings.json"
 }
 
@@ -80,6 +103,92 @@ kit_module_husky_marker() {
     kit_marker_block "$file" "$module" "$content"
     chmod +x "$file" 2>/dev/null || true
     KIT_MODULE_CREATED="${KIT_MODULE_CREATED} .husky/${hook}(kit:${module})"
+}
+
+# kit_scaffold_content <dest> <name> <content>
+# 宣告式安裝「生成內容」檔（無 template 來源、內容含安裝時展開的 kit 路徑）。
+# dest 已存在→skip 不覆寫（與 kit_scaffold_file 同語意）。
+kit_scaffold_content() {
+    local dest="$1" name="$2" content="$3"
+    if [ -f "$dest" ]; then
+        KIT_MODULE_SKIPPED="${KIT_MODULE_SKIPPED} ${name}"
+    else
+        printf '%s\n' "$content" > "$dest"
+        KIT_MODULE_CREATED="${KIT_MODULE_CREATED} ${name}"
+    fi
+}
+
+# kit_module_ensure_kit_yaml <repo_root> <kit_root>
+# <repo>/.claude/kit/kit.yaml 不存在 → 從 templates/kit.yaml 建立並把 kit_root
+# 寫死為安裝時的 kit 絕對路徑；已存在→skip 不覆寫（使用者手寫的部分宣告
+# 由各模組的 kit_module_decl_key 補缺 key，不動既有值）。
+kit_module_ensure_kit_yaml() {
+    local root="$1" kit_root="$2" dest="$1/.claude/kit/kit.yaml"
+    mkdir -p "${root}/.claude/kit"
+    if [ -f "$dest" ]; then
+        KIT_MODULE_SKIPPED="${KIT_MODULE_SKIPPED} kit.yaml"
+    else
+        sed "s|^kit_root: .*|kit_root: \"${kit_root}\"|" \
+            "${kit_root}/templates/kit.yaml" > "$dest"
+        KIT_MODULE_CREATED="${KIT_MODULE_CREATED} kit.yaml"
+    fi
+}
+
+# kit_module_decl_key <repo_root> <key> <default>
+# kit.yaml 缺該 top-level key 才 append（既有 kit.yaml 可能是使用者手寫的
+# 部分宣告）；key 已存在一律不動（含值為空——留空是合法的降級宣告）。
+kit_module_decl_key() {
+    local root="$1" key="$2" default="$3" f="${root}/.claude/kit/kit.yaml"
+    grep -q "^${key}:" "$f" 2>/dev/null && return 0
+    printf '%s: "%s"\n' "$key" "$default" >> "$f"
+    KIT_MODULE_CREATED="${KIT_MODULE_CREATED} kit.yaml(+${key})"
+}
+
+# kit_module_register <repo_root> <module>
+# 把模組名登記進 kit.yaml 的 modules 清單（空白分隔）。已含該名→skip 且
+# 不重寫檔案（冪等 diff 零）。modules 行不存在→append。
+kit_module_register() {
+    local root="$1" name="$2" f="${root}/.claude/kit/kit.yaml" mods tmp
+    mods="$(kit_decl_get "$f" modules '')"
+    case " ${mods} " in
+        *" ${name} "*)
+            KIT_MODULE_SKIPPED="${KIT_MODULE_SKIPPED} kit.yaml(modules已含${name})"
+            return 0
+            ;;
+    esac
+    if [ -n "$mods" ]; then mods="${mods} ${name}"; else mods="${name}"; fi
+    if grep -q '^modules:' "$f" 2>/dev/null; then
+        tmp="${f}.kit-reg.$$"
+        KIT_REG_MODS="$mods" awk '
+            !done && /^modules:/ { printf "modules: \"%s\"\n", ENVIRON["KIT_REG_MODS"]; done = 1; next }
+            { print }
+        ' "$f" > "$tmp" && mv "$tmp" "$f"
+    else
+        printf 'modules: "%s"\n' "$mods" >> "$f"
+    fi
+    KIT_MODULE_CREATED="${KIT_MODULE_CREATED} kit.yaml(modules+=${name})"
+}
+
+# kit_module_gitignore <repo_root> <section_comment> <line>...
+# .gitignore 逐行冪等 append（整行精確比對）；本輪真的有新增行才補段落
+# 註解（段落註解已存在也不重複）。
+kit_module_gitignore() {
+    local root="$1" section="$2" gitignore="${root}/.gitignore" added="" line
+    shift 2
+    [ -f "$gitignore" ] || : > "$gitignore"
+    for line in "$@"; do
+        grep -qxF "$line" "$gitignore" 2>/dev/null && continue
+        if [ -z "$added" ] && ! grep -qF "# ${section}" "$gitignore" 2>/dev/null; then
+            printf '\n# %s\n' "$section" >> "$gitignore"
+        fi
+        printf '%s\n' "$line" >> "$gitignore"
+        added="${added} ${line}"
+    done
+    if [ -n "$added" ]; then
+        KIT_MODULE_CREATED="${KIT_MODULE_CREATED} .gitignore(新增${added})"
+    else
+        KIT_MODULE_SKIPPED="${KIT_MODULE_SKIPPED} .gitignore(已含全部條目)"
+    fi
 }
 
 # kit_module_report <module-name>

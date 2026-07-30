@@ -249,6 +249,7 @@ git log --oneline -20
 - 預期輸出寫具體（`≥3 tests passed`，不是 `tests pass`）
 - 覆蓋場景自己判斷該驗什麼——happy path／edge case／誤用／資料守恆對帳／生產規模等角度視工作項性質取捨（資料管線類想想對帳與冪等、資料量敏感 UI 想想生產規模），合約列了的就要全跑
 - `quality-gates.md` 存在時：鉤子檔「Gate 指令」表中觸發條件命中的指令，注入對應工作項合約（例：動到 parser → 該項合約加一條 `pnpm quality:affected --run`）
+- `intake.config.yaml` 的 `spec_layer` 非空（專案有 RTM）時：每個工作項必帶 `matrix` 欄——對應 matrix 條目 ref 或 `none(理由)`，格式與傳遞機制見 `references/templates.md` Dashboard 模板的 matrix 欄說明
 - 碎片化統一項照 `references/ui-fragmentation-audit.md`「共用殼工作項 pattern」寫：每殼一個工作項；合約＝typecheck＋既有測試全綠＋一致性截圖自檢＋空資料態，**不新寫 unit test**（純換殼行為不變）
 - Bug fix 的孿生掃描（同錯誤模式全案搜尋）、UI 項的重用盤點（重用優先於新建，紀律見 `references/ui-fragmentation-audit.md`「元件重用紀律」節）——照做，但 `TWINS:`／`REUSE:` 標記需要時才寫，不再是合約完整性的必填欄
 
