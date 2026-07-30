@@ -205,7 +205,10 @@ check)
 ${offending}
 EOF
     if [ -z "${uncovered}" ]; then
-      git rev-parse HEAD > "$(stamp_path)"
+      git rev-parse HEAD > "$(stamp_path)" || {
+        echo "regate-guard: FAIL——自動補戳寫入失敗（放行憑證未落地，preauth 保留未銷毀）" >&2
+        exit 1
+      }
       rm -f "${pp}"
       echo "regate-guard: PASS（preauth 樹相符——branch 收尾 gate 已於合體樹 PASS，merge 未帶進新內容）"
       echo "  已自動補戳（$(git rev-parse --short HEAD)）並銷毀 preauth（單次有效）。"
