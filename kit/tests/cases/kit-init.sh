@@ -208,10 +208,19 @@ assert_contains "$KI_SKILL" "K7" "⑤ SKILL.md 標記 K7 未實裝"
 assert_contains "$KI_SKILL" ".kit-init-progress.yaml" "⑤ SKILL.md 含 progress 檔說明"
 
 # --- [K5-C 安全修] H2：worktree 安裝守衛（無豁免時必擋）
-H2_OUT="$(KIT_INIT_ALLOW_WORKTREE=0 bash "$KIT_ROOT/installers/kit-init.sh" --intake 2>&1)"
+# 環境無關化：把 kit-init.sh 複製進「假 worktree 路徑」執行——KIT_ROOT 由腳本自身位置推導，
+# 必含 .claude/worktrees/ 觸發守衛。直接跑 $KIT_ROOT 版在 main checkout 上守衛不觸發、
+# 會真裝進 kit repo（K5 收尾實踩：suite 中斷後 main 留下 installer 殘留）。
+H2_BASE="$(mktemp -d)"
+H2_FAKE="$H2_BASE/repo/.claude/worktrees/wave-x/kit/installers"
+mkdir -p "$H2_FAKE"
+cp "$KIT_ROOT/installers/kit-init.sh" "$H2_FAKE/"
+H2_TARGET="$(kit_test_sandbox)"
+H2_OUT="$( cd "$H2_TARGET" && KIT_INIT_ALLOW_WORKTREE=0 bash "$H2_FAKE/kit-init.sh" --intake 2>&1 )"
 H2_RC=$?
 assert_eq "1" "$H2_RC" "H2: worktree 安裝無豁免 exit 1"
 assert_contains "$H2_OUT" "worktree" "H2: 錯誤訊息指明 worktree"
+rm -rf "$H2_BASE" "$H2_TARGET"
 
 # --- [K5-C 安全修] H1：空檔 settings.json → merge 拒絕（非假成功）
 H1_SANDBOX="$(kit_test_sandbox)"
