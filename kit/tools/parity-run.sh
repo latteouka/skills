@@ -48,7 +48,13 @@ while [ $# -gt 0 ]; do
         --cmd-a)       [ $# -ge 2 ] || fail_closed "--cmd-a 缺值"; CMD_A="${2}"; shift 2 ;;
         --cmd-b)       [ $# -ge 2 ] || fail_closed "--cmd-b 缺值"; CMD_B="${2}"; shift 2 ;;
         --workdir-rel) [ $# -ge 2 ] || fail_closed "--workdir-rel 缺值"; WORKDIR_REL="${2}"; shift 2 ;;
-        --env)         [ $# -ge 2 ] || fail_closed "--env 缺值"; ENVS[${#ENVS[@]}]="${2}"; shift 2 ;;
+        --env)         [ $# -ge 2 ] || fail_closed "--env 缺值"
+                       # 缺 `=` 的值會被 env 當「要執行的指令」——兩邊對稱地跑錯 → 假 EQUIV
+                       case "${2}" in
+                           [A-Za-z_]*=*) case "${2%%=*}" in *[!A-Za-z0-9_]*) fail_closed "--env 變數名非法: ${2}" ;; esac ;;
+                           *) fail_closed "--env 須為 KEY=VAL 形式（缺 = 會被 env 當指令執行）: ${2}" ;;
+                       esac
+                       ENVS[${#ENVS[@]}]="${2}"; shift 2 ;;
         --state-glob)  [ $# -ge 2 ] || fail_closed "--state-glob 缺值"; STATE_GLOBS[${#STATE_GLOBS[@]}]="${2}"; shift 2 ;;
         *) fail_closed "未知參數: ${1}" ;;
     esac

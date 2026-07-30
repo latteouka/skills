@@ -181,3 +181,16 @@ assert_contains "${PR_CL}" "parity-run" "checklist 含 parity-run 用法"
 assert_contains "${PR_CL}" "--state-glob" "checklist 含 state-glob 對照建議"
 
 rm -rf "${PR_TMP}"
+
+# --- K5.5 sharp-edges 修：--env 缺 = ＝假 EQUIV 母題（env 把值當指令執行）
+PH_ENV_SRC="$(kit_test_sandbox)"
+( cd "$PH_ENV_SRC" && echo x > f && git add f && git -c user.name=t -c user.email=t@t commit -qm init )
+PH_ENV_OUT="$(bash "$KIT_ROOT/tools/parity-run.sh" --source "$PH_ENV_SRC" --ref HEAD \
+    --cmd-a "true" --cmd-b "true" --env "true" 2>&1)"
+PH_ENV_RC=$?
+assert_eq "2" "$PH_ENV_RC" "--env 缺 = → fail-closed exit 2"
+assert_contains "$PH_ENV_OUT" "KEY=VAL" "--env 缺 = 訊息指引格式"
+PH_ENV_OUT2="$(bash "$KIT_ROOT/tools/parity-run.sh" --source "$PH_ENV_SRC" --ref HEAD \
+    --cmd-a "true" --cmd-b "true" --env "1BAD=x" 2>&1)"
+assert_eq "2" "$?" "--env 變數名開頭數字 → fail-closed exit 2"
+rm -rf "$PH_ENV_SRC"
