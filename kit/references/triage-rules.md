@@ -95,7 +95,7 @@ grep -rn "<關鍵詞>" <spec_layer>
 
 ## 3. 去重
 
-與 `backlog/` 目錄既有 B-NNN.md 比對（同 matrix 條目 + 語意相近）→ 命中則併入既有檔的 `from` 欄，不新增條目。查詢用 `bash scripts/backlog-ls.sh --status ready` 或 `grep -al` 掃 frontmatter。
+與 `backlog/` 目錄既有 B-NNN.md 比對（同 matrix 條目 + 語意相近）→ 命中則併入既有檔的 `from` 欄，不新增條目。查詢用 `bash ~/projects/skills/kit/tools/backlog-ls.sh --status ready` 或 `grep -al` 掃 frontmatter。
 
 ## 4. 分流判定（flow 欄位）
 
