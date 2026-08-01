@@ -93,6 +93,8 @@ grep -rn "<關鍵詞>" <spec_layer>
 
 判為 `SPEC_CHANGE` 者，`status` 一律先填 `⚠️需客戶確認`，不得直接填 `ready`。
 
+auto-triage 材料化時 `SPEC_CHANGE` 一律 `status: ⚠️需客戶確認`——supervisor 端 hard hold，LLM 標 `needs_user: false` 也不生效。僅具備使用者原話 ID＋原文 hash 且方案已明確裁定者，人工 triage 可標 `ready`。
+
 ## 3. 去重
 
 與 `backlog/` 目錄既有 B-NNN.md 比對（同 matrix 條目 + 語意相近）→ 命中則併入既有檔的 `from` 欄，不新增條目。查詢用 `bash ~/projects/skills/kit/tools/backlog-ls.sh --status ready` 或 `grep -al` 掃 frontmatter。
