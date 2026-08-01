@@ -31,6 +31,12 @@ done
 [ -n "$REPO_ROOT" ] || REPO_ROOT="$(git rev-parse --show-toplevel)"
 BACKLOG_DIR="${REPO_ROOT}/.claude/dev/backlog"
 
+# 空 backlog：glob 不展開時 awk 會收到字面 B-*.md 路徑而 exit 2——先短路回 0 筆
+if ! compgen -G "${BACKLOG_DIR}/B-*.md" > /dev/null; then
+  if [ "$COUNT_ONLY" = "true" ]; then echo 0; else printf '\n共 0 筆\n'; fi
+  exit 0
+fi
+
 # 用 awk 一次掃描所有檔案，提取 frontmatter 欄位
 LC_ALL=C awk -v fstatus="$FILTER_STATUS" -v ftype="$FILTER_TYPE" -v fpri="$FILTER_PRI" -v count_only="$COUNT_ONLY" '
 BEGIN {
