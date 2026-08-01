@@ -1,7 +1,7 @@
 ---
 name: kit
 description: 專案工程機制安裝器與回饋管理引擎。用於：在新專案安裝工程機制模組（/kit-init，含 onboarding 訪談）、整理收件匣（/triage）。觸發詞：/kit-init、/triage、安裝 intake、整理收件匣、triage。
-argument-hint: "--intake|--backlog|--rtm|--wave-gates|--ratchet|--all（模組安裝）｜無參數＝onboarding 訪談｜/triage＝整理收件匣"
+argument-hint: "--intake|--backlog|--rtm|--wave-gates|--ratchet|--ctl|--all（模組安裝）｜無參數＝onboarding 訪談｜/triage＝整理收件匣"
 ---
 
 # Kit — 工程機制安裝器
@@ -27,11 +27,12 @@ diff 零。未知參數 exit 2。
 | `--rtm` | matrix scaffold、rtm-check gate、reqsync 雙 hook、讀側雙 hook、CLAUDE.md 協議段、config 回填、gitignore | intake |
 | `--wave-gates` | kit.yaml wave 段、gates.d／canary.d／pathspec-targets scaffold、merge-train 掛 .husky | backlog |
 | `--ratchet` | kit.yaml ratchet 段、counters.d scaffold、ratchet gate stub、baseline 初始化指引 | wave-gates |
+| `--ctl` | kit.yaml `ctl_*` 能力宣告三鍵（預設全保守）＋後續人工步驟指引（registry 註冊**刻意不自動**——防自我授權；合約見 dotfiles/docs/portfolio-ctl/） | — |
 | `--hygiene` | **K7 交付，未實裝**——單獨呼叫 exit 1；--all 列 skipped | — |
 | `--ui` | 同上（K7） | — |
 | `--ops` | 同上（K7） | — |
 
-`--all`＝已實裝五模組依序全裝、未實裝列 skipped(K7 交付)、整體 exit 0。
+`--all`＝已實裝六模組依序全裝（含 ctl）、未實裝列 skipped(K7 交付)、整體 exit 0。
 `--non-interactive` 透傳 intake（測試／自動化）。
 
 ### 2. `/kit-init`（無參數）— onboarding 訪談

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # installers/kit-init.sh — /kit-init 模組化 dispatcher（K5）。
 #
-# 用法：kit-init.sh [--intake] [--backlog] [--rtm] [--wave-gates] [--ratchet]
+# 用法：kit-init.sh [--intake] [--backlog] [--rtm] [--wave-gates] [--ratchet] [--ctl]
 #                   [--hygiene|--ui|--ops] [--all] [--non-interactive]
 #
 # 行為：
@@ -32,7 +32,7 @@ case "${KIT_ROOT}" in */.claude/worktrees/*)
 esac
 
 usage() {
-    echo "用法: kit-init.sh [--intake] [--backlog] [--rtm] [--wave-gates] [--ratchet] [--all] [--non-interactive]" >&2
+    echo "用法: kit-init.sh [--intake] [--backlog] [--rtm] [--wave-gates] [--ratchet] [--ctl] [--all] [--non-interactive]" >&2
     echo "     （--hygiene/--ui/--ops 為 K7 交付，尚未實裝；onboarding 訪談見 kit/SKILL.md）" >&2
 }
 
@@ -41,6 +41,7 @@ sel_backlog=false
 sel_rtm=false
 sel_wave_gates=false
 sel_ratchet=false
+sel_ctl=false
 sel_all=false
 noni=""
 unimpl_requested=""
@@ -54,6 +55,7 @@ for a in "$@"; do
         --rtm)             sel_rtm=true ;;
         --wave-gates)      sel_wave_gates=true ;;
         --ratchet)         sel_ratchet=true ;;
+        --ctl)             sel_ctl=true ;;
         --hygiene|--ui|--ops) unimpl_requested="${unimpl_requested} ${a#--}" ;;
         --all)             sel_all=true ;;
         --non-interactive) noni="--non-interactive" ;;
@@ -67,7 +69,7 @@ done
 
 if [ "${sel_all}" = "true" ]; then
     sel_intake=true; sel_backlog=true; sel_rtm=true
-    sel_wave_gates=true; sel_ratchet=true
+    sel_wave_gates=true; sel_ratchet=true; sel_ctl=true
 fi
 
 # --hygiene/--ui/--ops：未實裝。單獨指定＝硬錯；--all＝列 skipped 不擋。
@@ -78,7 +80,7 @@ fi
 
 if [ "${sel_intake}" != "true" ] && [ "${sel_backlog}" != "true" ] \
     && [ "${sel_rtm}" != "true" ] && [ "${sel_wave_gates}" != "true" ] \
-    && [ "${sel_ratchet}" != "true" ]; then
+    && [ "${sel_ratchet}" != "true" ] && [ "${sel_ctl}" != "true" ]; then
     usage
     exit 2
 fi
@@ -148,6 +150,9 @@ if [ "${sel_rtm}" = "true" ]; then
 fi
 if [ "${sel_ratchet}" = "true" ]; then
     run_module ratchet bash "${KIT_ROOT}/installers/modules/ratchet.sh"
+fi
+if [ "${sel_ctl}" = "true" ]; then
+    run_module ctl bash "${KIT_ROOT}/installers/modules/ctl.sh"
 fi
 
 echo ""
