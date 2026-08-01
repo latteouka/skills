@@ -74,3 +74,16 @@ rtm_nonpath_tokens: "Next.js Node.js"
 # rtm_notes_required: "divergent"
 # rtm_detail_specs_required: "implemented partial divergent"
 # rtm_impl_details_required: "implemented partial"
+
+# --- portfolio-ctl 能力宣告（供 portfolio supervisor 消費；合約 SSOT：
+# dotfiles/docs/portfolio-ctl/control-contract.md）--------------------------
+# 本檔宣告「能力」，registry（dotfiles/claude/portfolio-registry.json）宣告
+# 「上限」，有效權限＝交集取嚴。supervisor 只從 origin/main 讀本檔——worktree
+# 內改動不影響本 run 權限。registry 註冊一律人工在 dotfiles 側加（安全設計：
+# 安裝器/agent 不得自我授權），本模板只負責能力欄位存在。
+# ctl_close：report-only（預設，最保守）| pr-only | auto-squash
+ctl_close: "report-only"
+# ctl_dispatch_auto：supervisor 可否自動派發 backlog 直通項（"1"/"0"）
+ctl_dispatch_auto: "0"
+# ctl_profile：dev（wave 開發流）| ops（巡檢/文件流，attestation 永遠人工）
+ctl_profile: "dev"
