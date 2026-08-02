@@ -128,9 +128,15 @@ acquire)
         # 內跑完」的極端快時序。正常收尾（gate 10-20 分鐘）鎖齡必然遠超
         # 此門檻——真正防止 re-gate 進行中誤回收的防線是 cleanup 順序
         # （re-gate PASS → conditional-release → 清 worktree → 刪 branch）。
+        # ⚠ 回收安全性依賴波在 worktree 內跑——無 worktree 的波條件②
+        #   可在 merge 臨界區內成立，導致誤回收。dfaa 有 protect-paths
+        #   hook 強制 worktree，其他專案需自行確保。
+        # ⚠ epoch 重讀必須緊貼 mv 之前——順序不可調，這是 TOCTOU
+        #   緩解的關鍵：縮小讀 info 到 mv 之間的窗口。
         reclaim_epoch="$(read_info_field epoch || true)"
-        reclaim_age=$(( $(now_epoch) - ${reclaim_epoch:-0} ))
-        if [ "${reclaim_age}" -lt 300 ]; then
+        if [ -z "${reclaim_epoch:-}" ]; then
+          : # 讀不到 epoch → 不確定鎖齡 → 不回收（安全偏向）
+        elif [ $(( $(now_epoch) - reclaim_epoch )) -lt 300 ]; then
           : # 鎖齡 < 5 分鐘，不回收
         else
           desc="$(holder_desc)"
@@ -270,8 +276,8 @@ selftest)
     && echo "  ✓ ② 鎖目錄存在於 git-common-dir" \
     || { echo "  ✗ ② 鎖目錄不存在"; st_fail=1; }
   assert_rc 0 "③ 同 branch 重入不自我阻塞" bash "${self}" acquire
-  # 修正 lock info pid 為存活的 selftest process——①③ 的 subprocess 已退出，
-  # pid 死亡會觸發殘鎖三條件回收（真實場景持鎖 session 存活，不會如此）。
+  # pid 條件在真實場景恆成立（$$ 是 acquire 子行程，acquire 完即退出，
+  # 見 deferred (a)）。此處偽造活 pid 只為隔離測試②③條件。
   printf 'branch=%s\npid=%s\nepoch=%s\ntime=%s\n' \
     "${db}" "$$" "$(date +%s)" "$(date '+%Y-%m-%d %H:%M:%S')" \
     > "${tmp}/.git/wave-closure.lock/info"
@@ -417,8 +423,24 @@ selftest)
   fi
   ( cd "${tmp}" && bash "${self}" release --force ) >/dev/null 2>&1
 
+  # ⑯ info 檔存在但無 epoch 欄 → 不回收（epoch 讀不到 = 不確定 = 安全偏向）
+  mkdir -p "${tmp}/.git/wave-closure.lock"
+  printf 'branch=worktree-wave-test\npid=4999999\ntime=fake\n' \
+    > "${tmp}/.git/wave-closure.lock/info"
+  git -C "${tmp}" checkout -q "${db}" 2>/dev/null || true
+  noepoch_out="$(cd "${tmp}" && \
+    env WAVE_LOCK_WAIT_SECONDS=2 WAVE_LOCK_POLL_SECONDS=1 \
+    bash "${self}" acquire 2>&1 || true)"
+  if echo "${noepoch_out}" | grep -q "RECLAIMED"; then
+    echo "  ✗ ⑯ info 無 epoch 欄 → 不該回收但回收了"
+    st_fail=1
+  else
+    echo "  ✓ ⑯ info 無 epoch 欄 → 正確不回收（安全偏向）"
+  fi
+  ( cd "${tmp}" && bash "${self}" release --force ) >/dev/null 2>&1
+
   if [ "${st_fail}" -eq 0 ]; then
-    echo "selftest: PASS（15/15）"
+    echo "selftest: PASS（16/16）"
     exit 0
   fi
   echo "selftest: FAIL"
