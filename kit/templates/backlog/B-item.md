@@ -19,9 +19,10 @@ source: direct       # both | table-only | detail-only | direct | audit
 
 <為何判定此 type 的依據；BUG 附 repro>
 
+<!-- ready 階段不得留 ## proof 區（backlog-lint 檢查 8 會擋：結項證據沒同步翻 status ＝ 派發矛盾單）。
+     標 done/dropped 時才補：
 ## proof
-
-<done/dropped 必填：commit hash／實測輸出／counter 變化／閘門結果。填不出 proof 就不能標 done>
+commit hash／實測輸出／counter 變化／閘門結果。填不出 proof 就不能標 done -->
 
 ## notes
 

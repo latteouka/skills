@@ -71,6 +71,19 @@ assert_eq "1" "$lint_rc" "done 無 proof → exit 1"
 assert_contains "$lint_out" "proof 區塊為空" "done 無 proof 報對規則"
 rm -rf "$LD"
 
+# 檢查 8（B-376）：ready＋非空 proof＝派發矛盾單 → 必擋；
+# 反向（ready＋空骨架不擋）由上面 clean fixture 覆蓋（_bt_write_item proof 參數空
+# ＝留空 ## proof 標題，lint 仍 PASS）
+LP="$(kit_test_sandbox)"
+mkdir -p "$LP/.claude/dev/backlog"
+_bt_write_item "$LP/.claude/dev/backlog/B-003.md" "B-003" "ready" 'touches:
+  - "src/a.ts"' "使用者裁定 drop（測試 fixture）。"
+lint_out="$(bash "$TOOLS/backlog-lint.sh" --repo-root "$LP" 2>&1)"
+lint_rc=$?
+assert_eq "1" "$lint_rc" "ready＋非空 proof → exit 1（檢查 8）"
+assert_contains "$lint_out" "結項裁定沒同步翻 status" "檢查 8 報對規則"
+rm -rf "$LP"
+
 # id 與檔名不一致
 LM="$(kit_test_sandbox)"
 mkdir -p "$LM/.claude/dev/backlog"

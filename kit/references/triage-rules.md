@@ -49,11 +49,12 @@ created: 2026-07-29
 ---
 ## evidence
 （敘事）
-## proof
-（done/dropped 必填——commit hash／實跑輸出）
 ## notes
 （其餘）
 ```
+
+> `## proof` 區**標 done/dropped 時才補**（commit hash／實跑輸出）——ready 階段不得留（含空骨架），
+> backlog-lint 檢查 8 與 supervisor DISPATCH-CONTRADICTION 會擋「status 可派但 proof 已有結項證據」的矛盾單。
 
 **判斷不完整就不要硬填**——填錯的 `flow` 會讓大改動溜進 `direct` 而略過設計階段，比多繞一趟 inbox 貴得多。
 
