@@ -10,6 +10,8 @@ set -euo pipefail
 #   4. status 以 done:/dropped: 開頭必有 ## proof 區塊且非空
 #   5. id 與檔名一致
 #   6. 無重複 id
+#   8. status=ready 不得有非空 ## proof（結項證據沒同步翻 status ＝ 派發矛盾單，
+#      B-357 實證：drop 裁定只寫 proof、status 留 ready → supervisor 整波誤重派）
 #
 # --repo-root <path>：目標 repo 根目錄；未指定時用 git rev-parse --show-toplevel
 
@@ -120,6 +122,14 @@ for f in "$BACKLOG_DIR"/B-*.md; do
       fi
       ;;
   esac
+
+  # 8. ready 不得有非空 proof（B-376：裁定寫入必須原子同步 status）
+  if [ "$fm_status" = "ready" ]; then
+    proof_content=$(LC_ALL=C awk '/^## proof/{found=1; next} /^## /{if(found) exit} found && /[^ \t]/{print; exit}' "$f" 2>/dev/null || true)
+    if [ -n "$proof_content" ]; then
+      err "$fname: status=ready 但 ## proof 區塊非空——結項裁定沒同步翻 status（終案請改 done:/dropped:，proof 誤寫請刪該區塊）"
+    fi
+  fi
 
   # 5. id 與檔名一致
   if [ -n "$fm_id" ] && [ "$fm_id" != "$fname" ]; then
