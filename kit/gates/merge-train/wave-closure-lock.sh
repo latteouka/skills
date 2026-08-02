@@ -100,6 +100,52 @@ acquire)
       echo "closure-lock: RE-ENTER（同 branch 重入，branch=${branch}）"
       exit 0
     fi
+    # ── 殘鎖三條件自動回收 ──────────────────────────────────────
+    # 持鎖波已完成的三個確定訊號同時成立 → 殘鎖確定，自動回收：
+    #   ① pid 已死（持鎖 process 不存在）
+    #   ② worktree 已清（git worktree list 無該 branch）
+    #   ③ branch 已 merge 進 base_branch 或已刪除（squash merge 後常見）
+    # 三條件缺一不可——單獨任一都有「鎖仍有效」的合理場景：
+    #   pid 死但鎖保留至 merge 是正常設計；worktree 清但 branch 在等
+    #   PR review 也合理；branch merge 但 worktree 還在做 wave-close 也合理。
+    holder_pid="$(read_info_field pid || true)"
+    if [ -n "${holder_branch:-}" ] && [ -n "${holder_pid:-}" ]; then
+      stale_pid=0; stale_wt=0; stale_br=0
+      if ! kill -0 "${holder_pid}" 2>/dev/null; then
+        stale_pid=1
+      fi
+      if ! git worktree list 2>/dev/null | grep -qF "[${holder_branch}]"; then
+        stale_wt=1
+      fi
+      holder_tip="$(git rev-parse --verify -q "${holder_branch}" 2>/dev/null || true)"
+      if [ -z "${holder_tip:-}" ]; then
+        stale_br=1
+      elif git merge-base --is-ancestor "${holder_tip}" "${base_branch}" 2>/dev/null; then
+        stale_br=1
+      fi
+      if [ "${stale_pid}" -eq 1 ] && [ "${stale_wt}" -eq 1 ] && [ "${stale_br}" -eq 1 ]; then
+        # 最低鎖齡門檻：鎖齡從 acquire 起算，300s 只防「整個收尾在 5 分鐘
+        # 內跑完」的極端快時序。正常收尾（gate 10-20 分鐘）鎖齡必然遠超
+        # 此門檻——真正防止 re-gate 進行中誤回收的防線是 cleanup 順序
+        # （re-gate PASS → conditional-release → 清 worktree → 刪 branch）。
+        reclaim_epoch="$(read_info_field epoch || true)"
+        reclaim_age=$(( $(now_epoch) - ${reclaim_epoch:-0} ))
+        if [ "${reclaim_age}" -lt 300 ]; then
+          : # 鎖齡 < 5 分鐘，不回收
+        else
+          desc="$(holder_desc)"
+          # mv 原子改名取代 rm+mkdir——多 waiter 只一個 mv 成功，
+          # 輸家的 mv 失敗回等待圈，不會刪掉贏家的活鎖。
+          if mv "${lock_dir}" "${lock_dir}.reclaim.$$" 2>/dev/null; then
+            rm -rf "${lock_dir}.reclaim.$$"
+            echo "closure-lock: RECLAIMED（殘鎖自動回收）——原持有者 ${desc}"
+            echo "  三條件：pid ${holder_pid} 已死、worktree 已清、branch ${holder_branch:-?} 已 merge/已刪除"
+            continue  # 回圈頂走正常 mkdir 路徑公平競爭
+          fi
+        fi
+      fi
+    fi
+
     holder_epoch="$(read_info_field epoch || true)"
     if [ -n "${holder_epoch:-}" ]; then
       lock_age=$(( $(now_epoch) - holder_epoch ))
@@ -224,6 +270,11 @@ selftest)
     && echo "  ✓ ② 鎖目錄存在於 git-common-dir" \
     || { echo "  ✗ ② 鎖目錄不存在"; st_fail=1; }
   assert_rc 0 "③ 同 branch 重入不自我阻塞" bash "${self}" acquire
+  # 修正 lock info pid 為存活的 selftest process——①③ 的 subprocess 已退出，
+  # pid 死亡會觸發殘鎖三條件回收（真實場景持鎖 session 存活，不會如此）。
+  printf 'branch=%s\npid=%s\nepoch=%s\ntime=%s\n' \
+    "${db}" "$$" "$(date +%s)" "$(date '+%Y-%m-%d %H:%M:%S')" \
+    > "${tmp}/.git/wave-closure.lock/info"
   git -C "${tmp}" checkout -q -b other
   assert_rc 1 "④ 他 branch acquire 被互斥（等待逾時 exit 1）" \
     env WAVE_LOCK_WAIT_SECONDS=2 WAVE_LOCK_POLL_SECONDS=1 bash "${self}" acquire
@@ -276,10 +327,10 @@ selftest)
 
   # ── 🤖-3 camp 看門 ──────────────────────────────────────────
   # ⑪ 持鎖 >90 分鐘無 merge → 等待方見警告
-  # 偽造 epoch 為 95 分鐘前
+  # 偽造 epoch 為 95 分鐘前；pid 用存活 process 防殘鎖回收繞過 camp 測試
   fake_epoch=$(( $(date +%s) - 5700 ))
-  printf 'branch=worktree-wave-test\npid=99999\nepoch=%s\ntime=fake\n' \
-    "${fake_epoch}" > "${tmp}/.git/wave-closure.lock/info"
+  printf 'branch=worktree-wave-test\npid=%s\nepoch=%s\ntime=fake\n' \
+    "$$" "${fake_epoch}" > "${tmp}/.git/wave-closure.lock/info"
   camp_out="$(cd "${tmp}" && \
     env WAVE_LOCK_WAIT_SECONDS=2 WAVE_LOCK_POLL_SECONDS=1 WAVE_LOCK_CAMP_SECONDS=5400 \
     bash "${self}" acquire 2>&1 || true)"
@@ -294,10 +345,10 @@ selftest)
   # merge worktree-wave-test 的最新 commit 進 main
   ( cd "${tmp}" && bash "${self}" release --force ) >/dev/null 2>&1
   git -C "${tmp}" merge -q --no-edit worktree-wave-test
-  # 重建鎖（偽造舊 epoch）
+  # 重建鎖（偽造舊 epoch）；pid 用存活 process 防殘鎖回收繞過 camp 測試
   mkdir -p "${tmp}/.git/wave-closure.lock"
-  printf 'branch=worktree-wave-test\npid=99999\nepoch=%s\ntime=fake\n' \
-    "${fake_epoch}" > "${tmp}/.git/wave-closure.lock/info"
+  printf 'branch=worktree-wave-test\npid=%s\nepoch=%s\ntime=fake\n' \
+    "$$" "${fake_epoch}" > "${tmp}/.git/wave-closure.lock/info"
   git -C "${tmp}" checkout -q -b another-branch
   camp_out2="$(cd "${tmp}" && \
     env WAVE_LOCK_WAIT_SECONDS=2 WAVE_LOCK_POLL_SECONDS=1 WAVE_LOCK_CAMP_SECONDS=5400 \
@@ -311,8 +362,63 @@ selftest)
 
   ( cd "${tmp}" && bash "${self}" release --force ) >/dev/null 2>&1
 
+  # ── 殘鎖三條件自動回收 ──────────────────────────────────────
+  # ⑬ pid 死 + worktree 清 + branch 已 merge + 鎖齡 > 5 分鐘 → 自動回收
+  mkdir -p "${tmp}/.git/wave-closure.lock"
+  printf 'branch=worktree-wave-test\npid=4999999\nepoch=%s\ntime=fake\n' \
+    "$(( $(date +%s) - 600 ))" > "${tmp}/.git/wave-closure.lock/info"
+  git -C "${tmp}" checkout -q another-branch 2>/dev/null || git -C "${tmp}" checkout -q -b another-branch2
+  reclaim_out="$(cd "${tmp}" && \
+    env WAVE_LOCK_WAIT_SECONDS=3 WAVE_LOCK_POLL_SECONDS=1 \
+    bash "${self}" acquire 2>&1)"
+  rc=$?
+  if [ "${rc}" -eq 0 ] && echo "${reclaim_out}" | grep -q "RECLAIMED"; then
+    echo "  ✓ ⑬ 殘鎖三條件（pid 死＋worktree 清＋branch merged）→ 自動回收"
+  else
+    echo "  ✗ ⑬ 殘鎖三條件 → 未自動回收（exit=${rc}）"
+    st_fail=1
+  fi
+  ( cd "${tmp}" && bash "${self}" release --force ) >/dev/null 2>&1
+
+  # ⑭ 部分條件（pid 死＋worktree 清＋branch 未 merge）→ 不回收
+  git -C "${tmp}" checkout -q -b unmerged-wave
+  echo "unmerged work" > "${tmp}/unmerged.ts"
+  git -C "${tmp}" add unmerged.ts
+  git -C "${tmp}" -c user.email=selftest@local -c user.name=selftest \
+    commit -q -m "feat: unmerged"
+  mkdir -p "${tmp}/.git/wave-closure.lock"
+  printf 'branch=unmerged-wave\npid=4999999\nepoch=%s\ntime=fake\n' \
+    "$(( $(date +%s) - 600 ))" > "${tmp}/.git/wave-closure.lock/info"
+  git -C "${tmp}" checkout -q "${db}"
+  partial_out="$(cd "${tmp}" && \
+    env WAVE_LOCK_WAIT_SECONDS=2 WAVE_LOCK_POLL_SECONDS=1 \
+    bash "${self}" acquire 2>&1 || true)"
+  if echo "${partial_out}" | grep -q "RECLAIMED"; then
+    echo "  ✗ ⑭ 部分條件（branch 未 merge）→ 不該回收但回收了"
+    st_fail=1
+  else
+    echo "  ✓ ⑭ 部分條件（branch 未 merge）→ 正確不回收"
+  fi
+  ( cd "${tmp}" && bash "${self}" release --force ) >/dev/null 2>&1
+
+  # ⑮ 三條件齊備但鎖齡 < 5 分鐘 → 不回收（防收尾後段窗口）
+  mkdir -p "${tmp}/.git/wave-closure.lock"
+  printf 'branch=worktree-wave-test\npid=4999999\nepoch=%s\ntime=fake\n' \
+    "$(date +%s)" > "${tmp}/.git/wave-closure.lock/info"
+  git -C "${tmp}" checkout -q "${db}" 2>/dev/null || true
+  fresh_out="$(cd "${tmp}" && \
+    env WAVE_LOCK_WAIT_SECONDS=2 WAVE_LOCK_POLL_SECONDS=1 \
+    bash "${self}" acquire 2>&1 || true)"
+  if echo "${fresh_out}" | grep -q "RECLAIMED"; then
+    echo "  ✗ ⑮ 鎖齡 < 5 分鐘 → 不該回收但回收了"
+    st_fail=1
+  else
+    echo "  ✓ ⑮ 鎖齡 < 5 分鐘（三條件齊備）→ 正確不回收"
+  fi
+  ( cd "${tmp}" && bash "${self}" release --force ) >/dev/null 2>&1
+
   if [ "${st_fail}" -eq 0 ]; then
-    echo "selftest: PASS（12/12）"
+    echo "selftest: PASS（15/15）"
     exit 0
   fi
   echo "selftest: FAIL"
