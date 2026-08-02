@@ -45,6 +45,8 @@ Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由�
 
 ## 合併協助
 
+> **Dispatched 模式（`PORTFOLIO_DISPATCHED=1`）不適用本節**：executor 只 push branch，merge／re-gate／worktree 清理由 portfolio supervisor 承擔（diff 分流＋PR squash＋auto-regate），見 wave skill `references/dispatched-mode.md`。
+
 每波在 worktree 完成後，merge 回 main：
 
 1. merge 本波 branch 到 main——branch 名以 ledger 開工記錄為準（手動流程＝`wave/{id}`，原生 EnterWorktree＝harness 命名如 `worktree-wave-{id}`），不憑記憶猜

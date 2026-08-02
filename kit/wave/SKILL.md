@@ -49,6 +49,17 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 
 **需人裁定例外：** 執行期遇到需人裁定的事項，按「長跑行為規範」第 5 條非阻塞升級處理——僅當其阻塞所有剩餘工作時才停下。
 
+## Dispatched 模式（`PORTFOLIO_DISPATCHED=1`）
+
+> Portfolio supervisor 無人派發的波（env 由 dispatch_cmd 設定）。命中時本節**覆寫**下列條款；未命中（人工互動 wave）全文照舊。細則與依據見 [references/dispatched-mode.md](references/dispatched-mode.md)。實證：B-279/280/283/284 四波四種收法（自 merge 繞過 diff 分流、PENDING 等不在場的人、閒置不退場）。
+
+- **零停點**：兩個合法停點全部跳過（派發 prompt 即 Align 素材；Phase 4 只輸出清單不問，❓ 項採推薦方案並記 inbox）。禁用 AskUserQuestion。
+- **wave id 沿用 supervisor**：`{id}` ＝ env `PORTFOLIO_WAVE_ID`，不自產名稱。
+- **worktree 沿用當前 cwd**：supervisor 已預建 worktree 並以其為 cwd——Phase 6 Step 1 的建立動作跳過（守衛檢查照做）。
+- **收尾＝push branch 即結束**：`git push -u origin <branch>` 後輸出總結、結束 session。不 merge、不碰 main、不跑收尾流程步驟 5-6 的合併協助與 wave-close——gate 權威、diff 分流、merge、worktree 清理全由 supervisor 承擔。品質閘門自驗改跑 `wave-gate.sh baseline`（不取收尾鎖）。
+- **PENDING 禁止留給人**：待人事項一律 append 到 `.claude/dev/inbox.md`（`from: dispatched:{id}`）併入最後 commit——triage 會推到使用者手機；報告只留摘要。
+- **backlog 回寫照做**：status 改 `done:{id}`、dashboard/ledger `git rm`、待使用者事項搬 inbox，全部併入最後 commit（未 merge 也清——supervisor merge 整個 branch）。
+
 ## 相依 Skill 缺席降級
 
 本 skill 依賴的其他 skill：諮詢 `/askfable`；訪談 `/grill-me`、`/grill-with-docs`、`/brainstorm`（三者與 wave 同屬 kit package，正常安裝必在——本條款主要防跨 harness／未安裝環境）；安全 `/insecure-defaults`、`/sharp-edges`、`/semgrep`；UX `/ui-test`、`/wcag-accessibility-audit`、`/nielsen-heuristics-audit`、`/ux-audit-rethink`（安全與 UX 皆為 vendored 外部包）。任一在環境中不存在時，與原生工具 fallback 同 pattern 降級——缺席不得靜默跳過，也不得卡死流程：
@@ -347,6 +358,8 @@ Wave 規劃過程中 Claude 已經擁有完整脈絡（工作項、合約、決�
 
 **Step 1: 建立 Worktree（開工前的強制動作）**
 
+> **Dispatched 模式**：supervisor 已預建 worktree 且 cwd 就在其中——跳過本 Step 的建立動作（守衛檢查照做），wave id 用 `$PORTFOLIO_WAVE_ID`，直接從「Gitignore 防護」接續。
+
 **工具載入**：deferred-tool 環境先 `ToolSearch select:EnterWorktree,ExitWorktree,TaskCreate,TaskUpdate,ScheduleWakeup,SendMessage` 一次載齊本 skill 用到的原生工具（查無者視為環境不提供，走各條款的 fallback）。
 
 在輸出啟動宣告之前，先建立 worktree。**優先用原生工具**：環境有 `EnterWorktree` 工具時，直接 `EnterWorktree({ name: "wave-{id}" })`——harness 建立並追蹤 worktree，cwd 不會漂移（原生工具的 branch 命名由 harness 決定，如 `worktree-wave-{id}`，與手動流程的 `wave/{id}` 視同等效）。
@@ -622,7 +635,7 @@ E2E 開工前讀指南，解決問題後寫回指南。
    - **Q3 讀了會改變行為嗎？**（不是「知道就好」的常識）→ 是＝append 到 inbox 標「升級候選: CLAUDE.md」，實際落點由 `/triage` 裁定；否＝丟掉
    - 零條升級時在完成報告明寫「ERRATA N 條，全數判定為一次性，未升級」——沒寫＝沒判定
    - 未裝 intake kit 的專案：改 append 到本波 dashboard 的「未涵蓋決策」區
-5. **直接進入合併協助，不徵詢**——讀 [references/multi-wave.md](references/multi-wave.md)「合併協助」節照做（**單波也適用**：merge re-gate、UX 補跑回收、worktree 清理）。唯一仍要停的是步驟 3 的改法矛盾衝突（真需要使用者裁定改法），其餘一路做到 push 完成
+5. **直接進入合併協助，不徵詢**——讀 [references/multi-wave.md](references/multi-wave.md)「合併協助」節照做（**單波也適用**：merge re-gate、UX 補跑回收、worktree 清理）。唯一仍要停的是步驟 3 的改法矛盾衝突（真需要使用者裁定改法），其餘一路做到 push 完成。**Dispatched 模式：本步與步驟 6 不適用**——push branch 即收尾終點，merge／清理由 supervisor 承擔（見「Dispatched 模式」節）
 6. **merge 後清除本波產物**（`bash <kit>/scripts/wave-close.sh {id}`）——波的 dashboard 與
    ledger 在 merge 之後對未來沒有價值，內容留在 git history 即可。腳本會驗證每個檔都已提交
    且無未提交修改（任一不符即中止），把 `git show` 取回指令寫進 `wave-INDEX.md`，再 `git rm`
