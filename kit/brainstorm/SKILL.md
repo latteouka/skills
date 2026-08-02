@@ -120,8 +120,42 @@ digraph brainstorming {
 
 - Write the validated design (spec) to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`
   - (User preferences for spec location override this default)
+- The spec file MUST start with a machine-readable YAML frontmatter block (schema below) — downstream tooling (auto-decompose into backlog entries) consumes the frontmatter; the markdown body below it remains the human-readable design
 - Use elements-of-style:writing-clearly-and-concisely skill if available
 - Commit the design document to git
+
+**Machine-readable spec header (required):**
+
+```yaml
+---
+spec_id: <kebab-slug,與檔名 topic 一致>
+created: YYYY-MM-DD
+status: draft            # 使用者核准後改 approved;只有 approved 可進 decompose
+rtm_refs: []             # RTM 引用,格式同 backlog matrix 欄:<檔名去.yaml>/<req_id 末段>;無 RTM 專案留空
+stories:
+  - id: S1
+    as: <角色>
+    want: <一句話能力描述>
+    acceptance:          # 可驗證的完成條件——之後直接成為驗證合約素材
+      - "<具體、可執行、可判 pass/fail 的條件>"
+    not_in_scope: []     # 明確排除項,防 scope creep
+decisions:               # brainstorm 過程確認的設計決策(取代口頭共識,留痕)
+  - question: <決策點>
+    choice: <選擇>
+    reason: <理由>
+touches:
+  - path: <檔案路徑>
+    action: modify       # create|modify
+clarifications: []       # 未決事項;非空 = spec 不完整,禁止進入 writing-plans
+---
+```
+
+Frontmatter rules:
+
+- Every design decision the user confirmed during brainstorming goes into `decisions` — 口頭共識不落 frontmatter 等於沒發生
+- `acceptance` entries must be checkable (「搜尋 '王' 回傳姓名含王的結果」),不是行為重述(「搜尋功能正常」)
+- `clarifications` is the explicit ambiguity ledger: anything unresolved goes here instead of being silently guessed. Non-empty `clarifications` blocks the transition to writing-plans — resolve with the user first
+- The body must not contradict the frontmatter; the frontmatter is a faithful summary, not a separate document
 
 **Spec Self-Review:**
 After writing the spec document, look at it with fresh eyes:
@@ -129,7 +163,8 @@ After writing the spec document, look at it with fresh eyes:
 1. **Placeholder scan:** Any "TBD", "TODO", incomplete sections, or vague requirements? Fix them.
 2. **Internal consistency:** Do any sections contradict each other? Does the architecture match the feature descriptions?
 3. **Scope check:** Is this focused enough for a single implementation plan, or does it need decomposition?
-4. **Ambiguity check:** Could any requirement be interpreted two different ways? If so, pick one and make it explicit.
+4. **Ambiguity check:** Could any requirement be interpreted two different ways? If so, pick one and make it explicit — or, if only the user can resolve it, record it in frontmatter `clarifications`.
+5. **Frontmatter check:** Does the YAML frontmatter exist and parse? Is every user-confirmed decision in `decisions`? Is every `acceptance` entry pass/fail-checkable? Does the body agree with the frontmatter?
 
 Fix any issues inline. No need to re-review — just fix and move on.
 
@@ -138,7 +173,7 @@ After the spec review loop passes, ask the user to review the written spec befor
 
 > "Spec written and committed to `<path>`. Please review it and let me know if you want to make any changes before we start writing out the implementation plan."
 
-Wait for the user's response. If they request changes, make them and re-run the spec review loop. Only proceed once the user approves.
+Wait for the user's response. If they request changes, make them and re-run the spec review loop. Only proceed once the user approves. On approval, flip frontmatter `status: draft` → `approved` and commit — `approved` is the signal downstream tooling trusts.
 
 **Implementation:**
 
