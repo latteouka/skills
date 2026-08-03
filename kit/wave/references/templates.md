@@ -142,7 +142,7 @@ Phase 5 輸出 3 逐字填入（{id} 與約束代入本波實值）：
 Wave {id} 全部完成。完成標準：
 (1) 所有工作項合約指令全部跑過，輸出貼在 wave-{id}.md 對應合約結果欄
 (2) 每項覆蓋 happy path + edge case + 誤用場景 + 適用的資料守恆/規模場景（合約內列的全部跑過）
-(3) 品質閘門通過：🔒 安全 skill 0 high/critical；專案 gate script（scripts/hooks/wave-gate.sh 存在時）exit 0；🎨 UX 審計已執行並記錄，或依降級規則標「待 UX 補跑」封鎖閘門
+(3) 品質閘門通過：🔒 安全 skill 0 high/critical；TypeScript typecheck exit 0；🎨 UX 審計已執行並記錄，或依降級規則標「待 UX 補跑」封鎖閘門
 (4) requirements 對應項狀態已更新
 (5) wave-{id}.md「📋 延後決策」區已填寫（列出 grill 產出的所有未落地決策 + 優先順序；零延後明確寫零）
 (6) wave-{id}.md 狀態更新為「✅ 完成」
