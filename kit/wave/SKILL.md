@@ -517,32 +517,16 @@ cd .claude/worktrees/wave-{id}
 
 ### 品質閘門（所有工作項完成後）
 
-> **CRITICAL: 所有工作項 commit 完畢、合約全過後，必須跑品質閘門才能標「✅ 完成」。**
+#### TypeScript typecheck（收工前唯一必跑 gate）
 
-#### 安全閘門（合約內已逐項執行）
+跑專案 TypeScript typecheck。exit 0 才能收工；FAIL 回去修。
 
-安全 skill 已寫進各工作項合約（🔒 標記步驟）、逐項 commit 時跑完；此處最終確認 wave-{id}.md 所有 🔒 步驟都有輸出且 0 high/critical，遺漏 → 補跑不可跳過。
+**不跑的東西**：`wave-gate.sh`、ratchet、lint、test suite、drift 對帳——品質債事後還（deep lane 或 `pctl quality`），不擋在 merge 前。
 
-#### TypeScript typecheck（收工前唯一同步 gate）
+#### 安全與 UX（可選，使用者在場時建議跑）
 
-跑專案 TypeScript typecheck，完整輸出貼 wave-{id}.md。exit 0 才過閘門；FAIL 視同合約失敗，回去修。wave 內不得執行 `wave-gate.sh baseline` 或 `wave-gate.sh 收尾`；測試／ratchet／drift／資料對帳等完整品質檢查不由 wave 承擔。
-
-#### UX 閘門（批次執行）
-
-依 Phase 4 使用者確認的 UX 審計清單，逐一呼叫：
-1. 呼叫對應 skill（`/ui-test`、`/wcag-accessibility-audit`、`/nielsen-heuristics-audit`、`/ux-audit-rethink`）
-2. 收集 findings，寫入 wave-{id}.md「🎨 UX 審計結果」區塊
-3. 每個 finding 標 severity + 位置 + 建議修法
-4. **Advisory 不阻擋**——全部記錄，使用者下波決定是否處理
-5. 例外：`/ui-test` 跑出的**功能 bug**（按鈕點不動、表單送不出、頁面 crash）→ 視同合約失敗，必須修
-6. **降級規則（worktree 起不了 dev server 時）**：先查 `quality-gates.md`「worktree dev server 啟動方式」照做；仍不可行才允許降級——dashboard 狀態標「✅ 完成（UX 未跑：dev server 不可用）」，同時 `gh issue create --title "[ux] 補跑 UX 審計：…"`（見「問題出口」節），編號回填 dashboard。**禁止**標了「未跑」就沒有下文——wave 不 merge，沒有「merge 後補跑」這條路
-
-#### 閘門結果影響 wave 狀態
-
-- 安全 0 high/critical + TypeScript typecheck exit 0 + UX 審計已跑完記錄 → 品質閘門通過，進入收尾流程
-- 安全有 high/critical 殘留、或 TypeScript typecheck FAIL → **不可標「✅ 完成」**，回去修
-- UX findings 不影響狀態流轉但必須記錄（不可跳過不跑）；觸發降級規則則標「✅ 完成（UX 未跑：dev server 不可用）」＋開一則 `[ux]` issue（見「降級規則」）
-- 收工之後在 wave 之外跑出的紅燈，不回溯改本波狀態
+- **安全**：合約內 🔒 標記步驟逐項跑完即可，不額外跑閘門
+- **UX**：使用者要求時才跑（`/ui-test` 等），findings 開 issue，不阻擋收工
 
 ### E2E 驗證責任制
 
@@ -554,17 +538,7 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
 
 ### 專案品質鉤子（quality-gates.md）
 
-專案級品質工具透過鉤子檔接入（與 playwright-guide.md 同 pattern）。檔案不存在 = 相關條款全部跳過。
-
-**檔案位置：** `.claude/dev/quality-gates.md`（專案級，由專案自行維護；wave 只讀取不代建——但發現專案有品質工具而無鉤子檔時，向使用者建議建立）
-
-**格式：** 見 `references/hooks-formats.md` 的「quality-gates.md 格式範本」節，建立或檢查鉤子檔時照格式核對。
-
-**Wave 讀取點（兩處，皆屬規劃輔助）：**
-1. 開工前必讀 → 知道本專案有哪些 per-item gate
-2. Phase 3 合約 → 觸發條件命中的 gate 指令注入對應工作項合約；規模場景引用大案清單
-
-完整品質閘門不由 wave 解析本檔——`scripts/hooks/wave-gate.sh baseline` 由 wave 之外的機制承擔。
+檔案位置：`.claude/dev/quality-gates.md`（不存在就跳過）。Wave 開工前讀一次了解專案有哪些 per-item gate。完整品質閘門由 wave 之外的機制承擔（deep lane / `pctl quality`）。
 
 ### Playwright 使用指南（自動累積）
 
