@@ -35,13 +35,14 @@ assert_contains "$MP_OUT" "SKIP(無 merge_prep_cmd 宣告)" "merge-prep 無宣�
 
 # ②b 有宣告 → 於 repo 根執行宣告指令（marker 檔落在 repo 根＝cwd 正確）
 mkdir -p "$MT_SANDBOX/.claude/kit"
-printf 'merge_prep_cmd: "echo MT-PREP-MARKER && touch mt-prep-ran.txt"\n' \
+printf '%s\n' 'merge_prep_cmd: "test x${CI:-} = xtrue && echo MT-PREP-MARKER-CI-TRUE && touch mt-prep-ran.txt"' \
     > "$MT_SANDBOX/.claude/kit/kit.yaml"
 MP_OUT2="$(cd "$MT_SANDBOX/.claude" && bash "$MT_DIR/wave-merge-prep.sh" 2>&1)"
 MP_RC2=$?
 assert_eq "0" "$MP_RC2" "merge-prep 有宣告且指令成功 exit 0"
 assert_contains "$MP_OUT2" "MT-PREP-MARKER" "merge-prep 執行了宣告指令"
 assert_contains "$MP_OUT2" "PASS" "merge-prep 成功輸出 PASS"
+assert_contains "$MP_OUT2" "CI-TRUE" "merge-prep 非 TTY 時注入 CI=true"
 if [ -f "$MT_SANDBOX/mt-prep-ran.txt" ]; then
     assert_eq "yes" "yes" "merge-prep 宣告指令於 repo 根執行（子目錄呼叫仍落根）"
 else
