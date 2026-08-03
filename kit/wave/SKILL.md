@@ -1,6 +1,6 @@
 ---
 name: wave
-description: 規劃並啟動一波開發波次（純開發引擎）。適用於：開始一輪多工作項的開發、從 requirements 或回饋批次排工作、查看或放棄進行中的波。觸發詞：/wave、開新波、新一波、plan wave、啟動開發；子指令 /wave batch（讀 backlog 批次規劃多波、產全部 wave prompt）、/wave status、/wave drop {id}。
+description: 規劃並啟動一波開發波次（純開發引擎）。適用於：開始一輪多工作項的開發、從 issue 或回饋批次排工作、查看或放棄進行中的波。觸發詞：/wave、開新波、新一波、plan wave、啟動開發；子指令 /wave status、/wave drop {id}。
 argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方向"
 ---
 
@@ -20,8 +20,8 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 - **唯一停點制。** 全流程僅兩個合法停點，其餘階段轉換與項間一律自動接續——不停、不問、不結束 turn。詳見「停點規則」。
 - **收工＝push branch。** Wave 的合約到 `git push -u origin <branch>` 為止：不 merge、不碰 main、不清 worktree。branch push 之後由誰接手、跑什麼、何時進 main，都不在本 skill 的認知範圍內。
 - **品質不入 skill。** Wave 對品質唯一認識的概念＝各工作項驗證合約的實跑輸出，加上收工前一次 TypeScript typecheck 的 exit code（~90 秒，同步）。完整品質檢查一律寫進專案的 gate script／hook／lint，由 wave 之外的機制承擔，不得加進本 skill 的流程條文。
-- **問題先納入本波，真的不行才開 issue。** 冒出的問題預設當場解決並排進本波；只有驗證過的真 blocker 才外送——出口唯一，`gh issue create`，不寫 backlog、不寫 `.claude/dev/inbox.md`。詳見「問題出口」節。
-- **零模式判斷。** 本 skill 無模式偵測、無模式分支——LLM 的模式判斷是 drift 源。輸入來源固定為 Phase 2 四來源掃描（backlog 即來源 1），管線永遠同一條。
+- **問題先納入本波，真的不行才開 issue。** 冒出的問題預設當場解決並排進本波；只有驗證過的真 blocker 才外送——出口唯一，`gh issue create`。詳見「問題出口」節。
+- **零模式判斷。** 本 skill 無模式偵測、無模式分支——LLM 的模式判斷是 drift 源。輸入來源固定為 Phase 2 來源掃描（issues 即來源 1），管線永遠同一條。
 
 ## 停點規則（唯一停點制）
 
@@ -67,7 +67,7 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 2. 規模真的吸收不了嗎？——排 Checkpoint 分段能吃下的，就分段吃下，不外送
 3. 動它會牽到架構或資料模型嗎？——會＝外送並附「為何需要先討論」
 
-**外送出口唯一：`gh issue create`。不寫 `.claude/dev/backlog/`、不寫 `.claude/dev/inbox.md`。** 理由：backlog 會被自動派發、inbox 會被 triage 收成 backlog——兩者都讓未經人眼的項目自己排進生產線。
+**外送出口唯一：`gh issue create`。**
 
 ```bash
 gh issue create --title "[<類型>] <一句話>" --label "source:wave" --body "$(cat <<'EOF'
@@ -156,9 +156,7 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
    - ⚠️ 衝突（與現有描述矛盾）
    - ✅ 一致（已對齊）
 4. **確認衝突** — 只有 ⚠️ 項需要使用者裁定（逐條，附推薦方案）
-5. **落檔** — **不寫外部規格檔案（含 `inbox.md`、`backlog/`）**：本步驟產出的行為細節直接帶入
-   Phase 2/3，成為對應工作項的描述與合約依據，隨 Phase 5 一併寫入 `wave-{id}.md`（比照『輸出 2:
-   Session Context』既有機制）。素材裡本波確實吃不下的部分，走「問題出口」節開 issue，不落 inbox。
+5. **落檔** — 本步驟產出的行為細節直接帶入 Phase 2/3，成為對應工作項的描述與合約依據，隨 Phase 5 一併寫入 `wave-{id}.md`。吃不下的部分走「問題出口」節開 issue。
    - 本條只改 wave 自身「簡化版 align」的落檔目標；CONTEXT.md／ADR 等文件同步不由此步驟涵蓋，不受影響
 
 如果沒有新素材，跳過此 Phase。
@@ -167,49 +165,17 @@ Dashboard 檔名：`.claude/dev/wave-{id}.md`
 
 > 掃描必須在 Align（Phase 0 Step 3 / Phase 1）**之後**執行——新素材要先落檔 requirements 才掃得到，順序顛倒會掃到舊狀態。Phase 0 不預跑掃描。
 
-**回饋批次不降級：** 不論工作項來自哪個來源（backlog、驗收台 issue、LINE 回報、bug 清單），管線完全相同——驗證合約、🔒 安全步驟、品質閘門、goal condition 全部照走，不因「只是小修」降級任何規則。與 CONTEXT.md／requirements 矛盾的項先與使用者裁定，不默默改。
+**回饋批次不降級：** 不論工作項來自哪個來源（issue、驗收台、LINE 回報、bug 清單），管線完全相同——驗證合約、🔒 安全步驟、品質閘門、goal condition 全部照走，不因「只是小修」降級任何規則。
 
-> **CRITICAL: 掃描完備優先於掃描速度。四個來源各掃一輪後再掃一輪，連續兩輪無新工作項才准停。防「掃到夠交差就停」。**
-
-> **wave 不代跑 triage、不寫 backlog。** 來源 3 掃到的收件匣未整理項**只讀不動**——照其內容判斷能否排成本波工作項即可，不分類、不改檔、不寫 `backlog/`。`inbox.md` 的整理是 `/triage` 的職責，不是開波的前置。
+> **CRITICAL: 掃描完備優先於掃描速度。兩個來源各掃一輪後再掃一輪，連續兩輪無新工作項才准停。**
 >
-> **intake kit 缺席降級（比照「相依 Skill 缺席降級」pattern，非靜默跳過）：** 未裝 intake kit 的專案
-> （無 `backlog/` 目錄且無 `backlog.md`／無 `inbox.md`）→ ⚠️ 硬閘門與分流兩條連帶不適用
-> （沒有 backlog 就沒有 `status`／`flow` 欄位可讀）。來源 1（backlog 掃描）明確無產出——這是「未裝
-> intake kit」，不是「掃不到所以沒有待辦」；來源 3 自動退回掃舊 wave 的「📋 延後決策」（wave 原生格式，
-> 不依賴 intake kit，見下方 bash）。ledger 記一行「無 intake kit，來源 1 無產出、來源 3 走 fallback」；
-> 收尾報告品質 caveat 區列出。
->
-> **⚠️ 硬閘門：** `status: ⚠️需客戶確認` 的 backlog 項不得取用排波，即使使用者說「全部做完」。該項需
-> 人工改為 `ready` 或 `dropped` 才可取。
->
-> **分流：** 取用的項依其 `flow` 欄位處理——`direct` 直接排成工作項；`spec` 需先走 `/brainstorm`
-> （呼應下方 Phase 2.5 加碼判斷）。
-
-自動執行（不問使用者），四個來源：
+自動執行（不問使用者），兩個來源：
 
 ```bash
-# 來源 1：backlog 待排波項；無 backlog/ 目錄（且無 backlog.md）＝該專案未裝 intake kit
-if [ -d .claude/dev/backlog ]; then
-  bash scripts/backlog-ls.sh --status ready 2>/dev/null
-elif [ -f .claude/dev/backlog.md ]; then
-  grep -E '\| (ready) \|' .claude/dev/backlog.md 2>/dev/null
-fi
+# 來源 1：GitHub issues（開放的 signal）
+gh issue list --state open --label "signal" --json number,title --jq '.[] | "#\(.number) \(.title)"' 2>/dev/null | head -20
 
-# 來源 2：程式內待辦標記
-grep -rn "TODO\|FIXME" src/ lib/ app/ 2>/dev/null | head -50
-
-# 來源 3：收件匣未整理項；無 inbox.md（未裝 intake kit）→ 退回掃舊 wave 的延後決策
-# （-f 先判斷檔案存在，grep -c 才不會遇到「檔案不存在→空字串+exit 2」被誤讀成 0 的邊界）
-if [ -f .claude/dev/inbox.md ]; then
-  grep -c '^## INB-' .claude/dev/inbox.md
-  # 分片（多 session 並行的 capture 產出，triage 時合併——見 triage-rules §-1）
-  cat .claude/dev/inbox.d/*.md 2>/dev/null | grep -c '^## CAP-'
-else
-  grep -A 20 -E "📋 (未涵蓋決策|延後決策)" .claude/dev/wave-*.md 2>/dev/null
-fi
-
-# 來源 4：git log 近況（找做一半的工作）
+# 來源 2：git log 近況（找做一半的工作）
 git log --oneline -20
 ```
 
@@ -324,7 +290,7 @@ git log --oneline -20
 
 不阻擋，純資訊。`intersect` exit 0（無需裁定交集）時不顯示。
 
-分級判準（腳本內建，判準＝「合併時需不需要使用者裁定改法」）：append-only 檔（ledger、inbox、`playwright-guide.md`）與「兩邊各自加行／各自新增獨立區塊」（merge-tree 預演可自動合，或衝突但兩邊皆純加行）標可自動合併；同一行／同段邏輯衝突、兩邊各自新建同名檔標需裁定。
+分級判準（腳本內建，判準＝「合併時需不需要使用者裁定改法」）：append-only 檔（ledger、`playwright-guide.md`）與「兩邊各自加行／各自新增獨立區塊」（merge-tree 預演可自動合，或衝突但兩邊皆純加行）標可自動合併；同一行／同段邏輯衝突、兩邊各自新建同名檔標需裁定。
 
 > **CRITICAL: 執行期不主動報交集。** Phase 4 之後、直到收尾為止，**不因為讀到某個檔就回頭提「這裡可能跟別的波衝突」**。使用者的原話：「你會幫我處理 merge，但有時候是你自己發現有衝突提早在講」——那類提醒時機隨機、資訊零碎、且多數是假警報（實測：唯一常見交集是 append-only 的共用檔，merge-tree 顯示數十處衝突，但兩邊都是純 append，三秒可解）。
 >
@@ -638,9 +604,8 @@ E2E 開工前讀指南，解決問題後寫回指南。
    - **打勾必須寫回 dashboard**：核對結果以 `[x] + 一句佐證` 直接編輯進 wave-{id}.md 的 🎯 區塊、隨收尾 commit 進版控——只在對話輸出核對文字 = 沒核對
    - **核對 (7) 不可單勾**：必須在 🎯 區塊 (7) 下方列出本波實際發生的所有停點（時點 + 原因），逐一對照「停點規則」合法清單；單句斷言（「全程僅兩停點」）不算核對。有任何一次停點不在合法清單 → (7) 不可勾，如實記錄違規
    - **不派稽核 subagent 複驗交付物**：合約實跑輸出、gate script exit code、安全/UX 閘門記錄就是交付物真偽的認定依據。再派一個 agent 重跑一遍屬 over-verification，[官方 Opus 5 指引](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5)明列應移除
-   - **消化掉的 backlog 項改為 `done:{wave-id}`**
 3. **未涵蓋事項揭露**（每波必做）：
-   - **漏項回掃**：回掃 `docs/requirements/` 找有 🔴🟡❓ 但無對應工作項的項目，一律列入清單（含被標「已知延後」「使用者未裁定」的項）——只報事實，延後正當性由使用者判斷。這一步驗的是「有沒有沒做的事」，不是重驗已做的事
+   - **漏項回掃**：回掃 `docs/rtm/matrix/` 找有 divergent/partial 但無對應工作項的項目，一律列入清單——只報事實，延後正當性由使用者判斷
    - 列出本波期間開的所有 issue（`gh issue list --label source:wave --search "wave-{id}"` 對帳）
    - 在完成報告中**醒目列出**，每筆一行：issue 編號 ＋ 內容 ＋ 為何本波不能
    - **待裁決事項在收尾報告直接請使用者裁決，不預設開 issue**——使用者就在收尾停點上，裁決成本最低。裁「修」→ 就地開 followup 工作項執行完才關波；裁「延」→ 才開 issue。只有使用者未回應而必須關波時，才以「附推薦方案」形式開 issue
@@ -655,8 +620,7 @@ E2E 開工前讀指南，解決問題後寫回指南。
    git history 即可（`git log --diff-filter=D -- .claude/dev/wave-{id}.md` 取回）：
    - **先把 dashboard 裡的「待使用者」事項開成 issue**——人眼驗收、seed 重跑、待授權的破壞性操作等，
      清掉 dashboard 等於清掉這些待辦；先落到使用者會看的地方（issue）再清。
-   - 消化掉的 backlog 項 status 改 `done:{id}`
-   - `git rm` dashboard＋ledger＋同 wave_id 的 spec/plan，與上述回寫一起併入最後一個 commit
+   - `git rm` dashboard＋ledger＋同 wave_id 的 spec/plan，併入最後一個 commit
    - **為什麼是當場清、而不是標記等歸檔**：舊設計要求收尾寫 frontmatter（`status: done` +
      `closed`），交由 `Stop` hook 的 `archive.sh` 在 N 天後刪除。2026-07-25 實測 dfaa 的 52 個
      `wave-*.md`：**0 個有 frontmatter**，包含當天剛完成、走完整流程且閘門全綠的
