@@ -362,7 +362,7 @@ cd .claude/worktrees/wave-{id}
 
 **開工序列（worktree 建好後依序執行，每步缺一不可）：**
 
-1. **開工不跑完整 gate**——wave 內只在收工前同步跑一次 TypeScript typecheck；各工作項依自己的驗證合約執行觸及測試／E2E。完整 `wave-gate.sh baseline` 不由 wave 執行，不得在開工或收尾同步等待
+1. > **CRITICAL: 禁止跑 `wave-gate.sh`、`ratchet.sh`、或任何「baseline」指令。** 開工不跑 gate、收工不跑 gate。品質債事後還（`make deep-lane` 或 `pctl quality`）。Wave 內唯一的品質檢查是收工前的 TypeScript typecheck（`tsc --noEmit`，~90 秒）
 2. **Task 系統鏡像**——把工作項逐項 `TaskCreate`（subject = 項名，description 含合約要點），執行中用 `TaskUpdate` 推進 in_progress / completed——使用者在 UI 上看得到的即時進度層。Dashboard + ledger 仍是唯一 source of truth（版控、跨 session 持久），不一致以 dashboard 為準。環境無 TaskCreate 工具才可跳過，且須在 ledger 記一行「無 Task 工具，跳過鏡像」
 3. **輸出啟動宣告（Step 2）→ 直接開始第一個工作項**
 
