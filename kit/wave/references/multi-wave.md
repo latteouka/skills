@@ -52,7 +52,7 @@ Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由�
 1. merge 本波 branch 到 main——branch 名以 ledger 開工記錄為準（手動流程＝`wave/{id}`，原生 EnterWorktree＝harness 命名如 `worktree-wave-{id}`），不憑記憶猜
 2. 加法衝突（兩波各加不同欄位到同檔案）→ 自動合併
 3. 改法矛盾（同一行改成不同東西）→ 列出衝突 + 兩波原始意圖，使用者裁定
-4. **Merge re-gate（強制，貼輸出才算合併完成）**：在 main 上依序跑 ① `bash scripts/hooks/wave-gate.sh 收尾`（存在時；不存在則 typecheck＋fast tier 測試）② 受影響 view 的 E2E 子集（本波改動檔案對應的 golden-path spec，不整套跑）——任何紅燈先修再宣告合併完成。理由：merge 殘留 TS 錯誤曾多次上 main
+4. **Merge typecheck（強制，貼輸出才算合併完成）**：在 main 上跑專案 TypeScript typecheck；任何紅燈先修再宣告合併完成。E2E 子集與完整品質 gate 不在此重跑，由各工作項合約與 merge 後 deep lane 分別承擔
 5. **UX 補跑回收**：本波品質閘門若觸發降級規則（「待 UX 補跑」），此時 dev server 可用——立即補跑並回寫 wave-{id}.md，補跑完成才把狀態升級為「✅ 完成」
 6. 清理 worktree：環境有 `ExitWorktree` 工具用 `ExitWorktree({ action: "remove" })`；`discard_changes` 屬破壞性選項，僅在親自確認 worktree 無未合併變更後使用
 

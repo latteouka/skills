@@ -18,7 +18,7 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 - **一波帶走。** 所有掃出的未完成項都排進這一波，不建議延後。遇到真正的 blocker 在該項旁邊標註原因讓使用者決定，但不主動歸類為「建議延後」。
 - **範圍完整性不變量（全域，規劃期與執行期皆適用）。** 所有掃出的未完成項排進本波。工作量超出預期 → 排 Checkpoint 分段後開工。範圍縮減唯一合法路徑：**使用者主動提出**。session 時長與 context 都不是縮範圍的理由（見長跑規範第 3 條）。
 - **唯一停點制。** 全流程僅兩個合法停點，其餘階段轉換與項間一律自動接續——不停、不問、不結束 turn。詳見「停點規則」。
-- **品質不入 skill。** Wave 對「收尾品質」唯一認識的概念＝專案 gate script（`scripts/hooks/wave-gate.sh`）的 exit code。任何新的品質檢查需求一律寫進專案的 gate script／hook／lint，不得加進本 skill 的流程條文——skill checklist 是規則的暫存區，機器化後即刪。
+- **品質不入 skill。** Wave 對「merge 前品質」唯一認識的概念＝TypeScript typecheck 的 exit code（~90 秒，同步）。完整品質由 merge 後的 deep lane 承擔——supervisor 每 3 個 merge 跑一次完整 `wave-gate.sh baseline`，紅燈自動寫 inbox 開單，進正常 triage→dispatch 迴路修復。任何新的品質檢查需求一律寫進專案的 gate script／hook／lint（deep lane 會跑到），不得加進本 skill 的流程條文。
 - **零模式判斷。** 本 skill 無模式偵測、無模式分支——LLM 的模式判斷是 drift 源。輸入來源固定為 Phase 2 四來源掃描（backlog 即來源 1），管線永遠同一條。
 
 ## 停點規則（唯一停點制）
@@ -37,7 +37,7 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 - Phase 1 → 2 → 2.5 → 3
 - Phase 4 確認後 → Phase 5 產出 → Phase 6 建 worktree → 設 goal → 開工
 - 執行期項與項之間
-- 品質閘門 → 收尾
+- typecheck → merge
 
 **Turn 結束前自檢：** 結束 turn 前檢查最後一段輸出——若是計畫、問題、下一步清單、或「我接下來會…」的承諾 → 立刻用 tool call 做掉，不准就此結束 turn。（本節所列合法停點與例外的提問不在此限。）
 
@@ -56,7 +56,7 @@ argument-hint: "（選填）逐字稿路徑、會議檔案、或簡述這波方�
 - **零停點**：兩個合法停點全部跳過（派發 prompt 即 Align 素材；Phase 4 只輸出清單不問，❓ 項採推薦方案並記 inbox）。禁用 AskUserQuestion。
 - **wave id 沿用 supervisor**：`{id}` ＝ env `PORTFOLIO_WAVE_ID`，不自產名稱。
 - **worktree 沿用當前 cwd**：supervisor 已預建 worktree 並以其為 cwd——Phase 6 Step 1 的建立動作跳過（守衛檢查照做）。
-- **收尾＝push branch 即結束**：`git push -u origin <branch>` 後輸出總結、結束 session。不 merge、不碰 main、不跑收尾流程步驟 5-6 的合併協助與 wave-close——gate 權威、diff 分流、merge、worktree 清理全由 supervisor 承擔。品質閘門自驗改跑 `wave-gate.sh baseline`（不取收尾鎖）。
+- **收尾＝push branch 即結束**：`git push -u origin <branch>` 後輸出總結、結束 session。不 merge、不碰 main、不跑收尾流程步驟 5-6 的合併協助與 wave-close——push 後由 supervisor 跑 TypeScript typecheck、diff 分流、merge 與 worktree 清理；完整 gate 只由 merge 後 deep lane 執行。
 - **PENDING 禁止留給人**：待人事項一律 append 到 `.claude/dev/inbox.md`（`from: dispatched:{id}`）併入最後 commit——triage 會推到使用者手機；報告只留摘要。
 - **backlog 回寫照做**：status 改 `done:{id}`、dashboard/ledger `git rm`、待使用者事項搬 inbox，全部併入最後 commit（未 merge 也清——supervisor merge 整個 branch）。
 
@@ -381,7 +381,7 @@ cd .claude/worktrees/wave-{id}
 
 **開工序列（worktree 建好後依序執行，每步缺一不可）：**
 
-1. **基線綠燈**——專案有 `scripts/hooks/wave-gate.sh` 時，跑 `bash scripts/hooks/wave-gate.sh 收尾` 當基線（涵蓋測試／typecheck／專案自定 gate，輸出帶唯一標記字串確認是本輪跑出的）；無 gate script 的專案跑一次現有測試基線。結果記進 ledger 第一行。之後任何紅燈都可歸因是本波引入還是既存問題——上波遺留的污染在開工時現形，不是收尾才發現
+1. **開工不跑完整 gate**——wave 內只在 merge 前同步跑 TypeScript typecheck；各工作項依自己的驗證合約執行觸及測試／E2E。完整 `wave-gate.sh baseline` 僅由 merge 後 deep lane 執行，不得在開工或收尾同步等待
 2. **Task 系統鏡像**——把工作項逐項 `TaskCreate`（subject = 項名，description 含合約要點），執行中用 `TaskUpdate` 推進 in_progress / completed——使用者在 UI 上看得到的即時進度層。Dashboard + ledger 仍是唯一 source of truth（版控、跨 session 持久），不一致以 dashboard 為準。環境無 TaskCreate 工具才可跳過，且須在 ledger 記一行「無 Task 工具，跳過鏡像」
 3. **輸出啟動宣告（Step 2）→ 直接開始第一個工作項**
 
@@ -540,9 +540,9 @@ cd .claude/worktrees/wave-{id}
 
 安全 skill 已寫進各工作項合約（🔒 標記步驟）、逐項 commit 時跑完；此處最終確認 wave-{id}.md 所有 🔒 步驟都有輸出且 0 high/critical，遺漏 → 補跑不可跳過。
 
-#### 專案 gate script（scripts/hooks/wave-gate.sh 存在時）
+#### TypeScript typecheck（merge 前唯一同步 gate）
 
-跑 `bash scripts/hooks/wave-gate.sh 收尾`，完整輸出貼 wave-{id}.md。exit 0 才過閘門；FAIL 視同合約失敗，回去修——不得以「與本波無關」自行豁免（真的無關也要修或升級給使用者裁定，因為它出現在本波的門檻上）。gate 內容（typecheck／測試／ratchet／drift／資料對帳…）由專案 script 自行定義維護，wave 不解析其細節；script 不存在的專案跳過本段。
+跑專案 TypeScript typecheck，完整輸出貼 wave-{id}.md。exit 0 才過閘門；FAIL 視同合約失敗，回去修。wave 內不得執行 `wave-gate.sh baseline` 或 `wave-gate.sh 收尾`；測試／ratchet／drift／資料對帳等完整品質檢查由 merge 後 deep lane 執行。
 
 #### UX 閘門（批次執行）
 
@@ -556,9 +556,10 @@ cd .claude/worktrees/wave-{id}
 
 #### 閘門結果影響 wave 狀態
 
-- 安全 0 high/critical + 專案 gate 全 PASS（有鉤子檔時）+ UX 審計已跑完記錄 → 品質閘門通過，進入收尾流程
-- 安全有 high/critical 殘留、或專案 gate 有 FAIL → **不可標「✅ 完成」**，回去修
+- 安全 0 high/critical + TypeScript typecheck exit 0 + UX 審計已跑完記錄 → 品質閘門通過，進入收尾流程
+- 安全有 high/critical 殘留、或 TypeScript typecheck FAIL → **不可標「✅ 完成」**，回去修
 - UX findings 不影響狀態流轉但必須記錄（不可跳過不跑）；觸發降級規則則只能標「✅ 完成（待 UX 補跑）」，合併協助補跑完成後才升級為「✅ 完成」（見「降級規則」）
+- deep lane 紅燈不回溯改本波狀態——以 inbox 開單走 triage→dispatch 修復
 
 ### E2E 驗證責任制
 
@@ -580,7 +581,7 @@ E2E spec **檔案的存留政策**（開發期 spec 是否併入 main、驗收 s
 1. 開工前必讀 → 知道本專案有哪些 per-item gate
 2. Phase 3 合約 → 觸發條件命中的 gate 指令注入對應工作項合約；規模場景引用大案清單
 
-收尾級閘門不再由 wave 解析本檔——一律由 `scripts/hooks/wave-gate.sh` 承擔（該 script 自行消費本檔或內建等效檢查）。
+完整品質閘門不由 wave 解析本檔——由 merge 後 deep lane 跑的 `scripts/hooks/wave-gate.sh baseline` 承擔。
 
 ### Playwright 使用指南（自動累積）
 
@@ -652,4 +653,3 @@ E2E 開工前讀指南，解決問題後寫回指南。
 ## 多波並行
 
 多波並行規則（隔離策略、`/wave batch`、`/wave status`、`/wave drop`、合併協助）讀 [references/multi-wave.md](references/multi-wave.md)。收尾流程步驟 5 的合併協助亦在該檔。
-
