@@ -449,7 +449,17 @@ while IFS=$'\t' read -r target_form target_rel target_strict || [ -n "${target_f
   source_name="${hook_file#"${PROJECT_ROOT}"/}"
   parse_out="$(parse_script_hook_file "${hook_file}")"
   parse_rc=$?
-  [ "${parse_rc}" -eq 0 ] || { echo "pathspec-liveness: 解析 [${source_name}] 失敗" >&2; exit 1; }
+  if [ "${parse_rc}" -ne 0 ]; then
+    echo "pathspec-liveness: 解析 [${source_name}] 失敗（awk exit=${parse_rc}），fail-closed，拒絕通過" >&2
+    printf '%s\n' "${parse_out}" | grep '^PARSE_ERROR:' \
+      | awk -F: '{
+          lineno = $2; reason = $3; detail = $4
+          printf "  %s:%s  %s%s\n", "'"${source_name}"'", lineno, reason, (detail == "" ? "" : " [" detail "]")
+          if (reason == "unresolved-variable")
+            printf "    → pathspec 必須是字面路徑；本行用了變數 ${%s}。改寫成字面值（例如 -- '\''.claude/dev/inbox.md'\''），變數留給其他用途即可。\n", detail
+        }' >&2
+    exit 1
+  fi
   # 注意：不對空 parse_out 提前 continue——目標存在但解析出 0 條 pathspec
   # 本身就是待判定的情況（見下方目標層 0 條檢查），不能靜默略過整個目標。
   if [ -n "${parse_out}" ]; then
