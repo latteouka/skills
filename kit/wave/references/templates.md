@@ -93,12 +93,11 @@ Subagent-Driven（既定）／ Inline＋一句具體理由（記入 dashboard Me
 （收尾流程步驟 3 回掃 `docs/requirements/` 的結果：有 🔴🟡❓ 但無對應工作項者逐條列出，無則寫「無漏項」）
 
 ## 📋 未涵蓋決策
-<!-- 有裝 intake kit 的專案：整區刪除。未涵蓋項 append 到 .claude/dev/inbox.md
-     （from: grill:{題目}），由下次開波的 triage 一併處理，wave 不自維護此表。
-     此區僅供未裝 kit 的專案使用。 -->
-| # | 決策 | 來源 | 為何本波不做 |
-|---|------|------|-------------|
-| 1 | [決策內容] | [spec §N / grill Q#] | [scope cut / blocker / 依賴未就緒] |
+<!-- 每筆未涵蓋項都必須先過「問題出口」節的可解性檢查、開成 GitHub issue（[gap] + source:wave），
+     issue 編號填進下表。gh 不可用時才只留本表，並在收尾報告品質 caveat 區揭露。 -->
+| # | 決策 | 來源 | 為何本波不做 | issue |
+|---|------|------|-------------|-------|
+| 1 | [決策內容] | [spec §N / grill Q#] | [外部 blocker / 需先討論架構] | #NNN |
 ```
 
 ## Ledger 格式
@@ -142,9 +141,9 @@ Phase 5 輸出 3 逐字填入（{id} 與約束代入本波實值）：
 Wave {id} 全部完成。完成標準：
 (1) 所有工作項合約指令全部跑過，輸出貼在 wave-{id}.md 對應合約結果欄
 (2) 每項覆蓋 happy path + edge case + 誤用場景 + 適用的資料守恆/規模場景（合約內列的全部跑過）
-(3) 品質閘門通過：🔒 安全 skill 0 high/critical；TypeScript typecheck exit 0；🎨 UX 審計已執行並記錄，或依降級規則標「待 UX 補跑」封鎖閘門
+(3) 品質閘門通過：🔒 安全 skill 0 high/critical；TypeScript typecheck exit 0；🎨 UX 審計已執行並記錄，或依降級規則標「UX 未跑」並開 [ux] issue
 (4) requirements 對應項狀態已更新
-(5) wave-{id}.md「📋 延後決策」區已填寫（列出 grill 產出的所有未落地決策 + 優先順序；零延後明確寫零）
+(5) 所有未落地決策都已過可解性檢查——能做的已排進本波，真不能做的已開成 issue 並回填 dashboard「📋 未涵蓋決策」區；零延後明確寫零
 (6) wave-{id}.md 狀態更新為「✅ 完成」
 (7) 全程遵守唯一停點制——除「停點規則」所列合法停點與例外（Align、範圍確認、Phase 2.5 訪談、破壞性操作確認、阻塞全部剩餘工作的需人裁定）外未曾停下等待輸入
 約束：不動其他波正在處理的檔案（[列出其他波 ID: 涉及檔案]）。不碰其他 wave-*.md。
@@ -159,7 +158,7 @@ Wave {id} 全部完成。完成標準：
 | (2) 覆蓋場景 | 各項合約覆蓋場景欄的 test case 對應 |
 | (3) 品質閘門 | gate script exit code + 安全/UX 閘門記錄 |
 | (4) requirements | commit SHA（更新 requirements 的 commit） |
-| (5) 延後決策 | dashboard 📋 區內容 |
+| (5) 未涵蓋決策 | dashboard 📋 區內容 + 對應 issue 編號 |
 | (6) 狀態 | dashboard 頂部狀態行 |
 | (7) 停點制 | 列出本波所有停點時點+原因，逐一對照合法清單 |
 
@@ -194,6 +193,6 @@ Wave {id} 全部完成。完成標準：
 - prisma/schema.prisma → orders-api, report-ui
 
 ### 建議下一步
-- report-ui 已完成，可 merge 回 main
+- report-ui 已收工（branch 已 push），可安排合併
 - orders-api 還在跑，3/5 完成
 ```

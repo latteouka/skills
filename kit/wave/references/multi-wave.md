@@ -12,7 +12,7 @@ Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由�
 1. 所有波在獨立 worktree 工作，互不影響 working tree
 2. 每個波只讀寫自己的 `wave-{id}.md`
 3. `playwright-guide.md` 併發寫入處理：每個 worktree 維護自己的副本，merge 回 main 時自動合併（append-only 格式天然可合併）
-4. `prisma/schema.prisma` 等共用檔案的衝突在 merge 階段處理（見合併協助段落）
+4. `prisma/schema.prisma` 等共用檔案的衝突在合併階段處理（見「合併參考」節，發生在 wave 之外）
 
 ## `/wave batch` — 批次規劃多波（backlog 一次排完）
 
@@ -43,17 +43,17 @@ Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由�
 2. `/wave status` 不再顯示該波
 3. 不自動刪 worktree 或檔案——使用者想清理就手動清
 
-## 合併協助
+## 合併參考（wave 流程外）
 
-> **Dispatched 模式（`PORTFOLIO_DISPATCHED=1`）不適用本節**：executor 只 push branch，merge／re-gate／worktree 清理由 portfolio supervisor 承擔（diff 分流＋PR squash＋auto-regate），見 wave skill `references/dispatched-mode.md`。
+> **本節不是 wave 的步驟。** Wave 收工於 `git push -u origin <branch>`，不 merge、不碰 main、不清 worktree。以下是人工合併已收工的波時的查閱材料。
 
-每波在 worktree 完成後，merge 回 main：
+把一個已 push 的波 branch 併回 main 時：
 
 1. merge 本波 branch 到 main——branch 名以 ledger 開工記錄為準（手動流程＝`wave/{id}`，原生 EnterWorktree＝harness 命名如 `worktree-wave-{id}`），不憑記憶猜
 2. 加法衝突（兩波各加不同欄位到同檔案）→ 自動合併
 3. 改法矛盾（同一行改成不同東西）→ 列出衝突 + 兩波原始意圖，使用者裁定
-4. **Merge typecheck（強制，貼輸出才算合併完成）**：在 main 上跑專案 TypeScript typecheck；任何紅燈先修再宣告合併完成。E2E 子集與完整品質 gate 不在此重跑，由各工作項合約與 merge 後 deep lane 分別承擔
-5. **UX 補跑回收**：本波品質閘門若觸發降級規則（「待 UX 補跑」），此時 dev server 可用——立即補跑並回寫 wave-{id}.md，補跑完成才把狀態升級為「✅ 完成」
+4. **Merge typecheck（強制，貼輸出才算合併完成）**：在 main 上跑專案 TypeScript typecheck；任何紅燈先修再宣告合併完成。E2E 子集與完整品質 gate 不在此重跑
+5. **UX 補跑回收**：波若開了 `[ux]` issue（worktree 起不了 dev server 的降級），此時 dev server 可用，可順手補跑
 6. 清理 worktree：環境有 `ExitWorktree` 工具用 `ExitWorktree({ action: "remove" })`；`discard_changes` 屬破壞性選項，僅在親自確認 worktree 無未合併變更後使用
 
 不自動 force merge——有矛盾必停，呈現衝突 + 推薦方案，使用者確認才執行。
