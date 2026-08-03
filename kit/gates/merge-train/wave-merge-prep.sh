@@ -44,6 +44,13 @@ fi
 cd "${repo_root}" || exit 1
 
 echo "[merge-prep] 執行宣告自癒指令：${merge_prep_cmd}"
+# pnpm 在無 TTY 且未標 CI 時會拒絕重建 node_modules，回
+# ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY。portfolio／CI 等 headless 執行面
+# 本來就不能互動確認；只在呼叫端未明示 CI 且 stdin 非 TTY 時補 true，並把影響
+# 限縮在 merge-prep 子程序，不改後續 Playwright/test 的 CI 行為。
+if [ ! -t 0 ] && [ -z "${CI+x}" ]; then
+  export CI=true
+fi
 if ! bash -c "${merge_prep_cmd}"; then
   echo "[merge-prep] FAIL——merge_prep_cmd 執行失敗（healer 修不動，需人工收斂）。"
   echo "  常見原因：lockfile 與 package.json 不一致（install 後把 lockfile 一起 commit）、"
