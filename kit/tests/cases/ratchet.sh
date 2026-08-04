@@ -7,7 +7,7 @@
 # ④compare 模式 counter return 1 → 立即 exit 1（後續 counter 不執行）
 # ⑤雙向核對兩態各紅（有鍵無檔／有檔無鍵）＋0 個 counter 檔 fail-closed
 # ⑥baseline 0 硬擋
-# ⑦slow counter 四態（compare 跳過／RATCHET_FULL=1 跑／tighten、report 不受影響）
+# ⑦slow counter 五態（compare 跳過／RATCHET_FULL=1、--all 跑／tighten、report 不受影響）
 # ⑧lib 檔（NN-*.lib.sh）不觸發核對＋有檔無函式紅
 # ⑨inputs_ 定義但 origin 不可達 → 保守全跑（＋origin 可達時 skip／相關變更時跑）
 # ⑩--count <name> 與 --count-<name> 糖衣等價
@@ -196,21 +196,32 @@ else
     assert_eq "slowc marker 存在" "不存在" "⑦b RATCHET_FULL=1 時 slow counter 真的跑了"
 fi
 rm -f "$RT_R7/ran-slowc.marker"
-rt_run "$RT_R7" --tighten
-assert_eq "0" "$RT_RC" "⑦c tighten exit 0"
+echo 2 > "$RT_R7/slowc.value"
+rt_run "$RT_R7" --all
+assert_eq "1" "$RT_RC" "⑦c --all 會執行 slow counter 並攔退步"
+assert_contains "$RT_OUT" "slowc 現值 2 > baseline 1" "⑦c --all 不產生 slow skip"
 if [ -f "$RT_R7/ran-slowc.marker" ]; then
-    assert_eq "yes" "yes" "⑦c tighten 不受 slow 影響（全跑）"
+    assert_eq "yes" "yes" "⑦c --all 真的跑了 slow counter"
 else
-    assert_eq "slowc marker 存在" "不存在" "⑦c tighten 不受 slow 影響（全跑）"
+    assert_eq "slowc marker 存在" "不存在" "⑦c --all 真的跑了 slow counter"
+fi
+rm -f "$RT_R7/ran-slowc.marker"
+echo 1 > "$RT_R7/slowc.value"
+rt_run "$RT_R7" --tighten
+assert_eq "0" "$RT_RC" "⑦d tighten exit 0"
+if [ -f "$RT_R7/ran-slowc.marker" ]; then
+    assert_eq "yes" "yes" "⑦d tighten 不受 slow 影響（全跑）"
+else
+    assert_eq "slowc marker 存在" "不存在" "⑦d tighten 不受 slow 影響（全跑）"
 fi
 rm -f "$RT_R7/ran-slowc.marker"
 rt_run "$RT_R7" --report
-assert_eq "0" "$RT_RC" "⑦d report exit 0"
-assert_contains "$RT_OUT" "slowc=1(baseline=1)" "⑦d report 不受 slow 影響（實值入列）"
+assert_eq "0" "$RT_RC" "⑦e report exit 0"
+assert_contains "$RT_OUT" "slowc=1(baseline=1)" "⑦e report 不受 slow 影響（實值入列）"
 if [ -f "$RT_R7/ran-slowc.marker" ]; then
-    assert_eq "yes" "yes" "⑦d report 真的跑了 slow counter"
+    assert_eq "yes" "yes" "⑦e report 真的跑了 slow counter"
 else
-    assert_eq "slowc marker 存在" "不存在" "⑦d report 真的跑了 slow counter"
+    assert_eq "slowc marker 存在" "不存在" "⑦e report 真的跑了 slow counter"
 fi
 
 # ── ⑧ lib 檔不觸發核對＋有檔無函式紅 ──────────────────────────────
@@ -267,20 +278,31 @@ if [ -f "$RT_R9/ran-scoped.marker" ]; then
 else
     assert_eq "yes" "yes" "⑨b skip 證據：counter 未執行"
 fi
+echo 2 > "$RT_R9/scoped.value"
+rt_run "$RT_R9" --all
+assert_eq "1" "$RT_RC" "⑨c --all 在 origin/main=HEAD 時仍執行 scoped counter 並攔退步"
+assert_contains "$RT_OUT" "scoped 現值 2 > baseline 1" "⑨c --all 輸出真實現值，不沿用 baseline"
+if [ -f "$RT_R9/ran-scoped.marker" ]; then
+    assert_eq "yes" "yes" "⑨c --all 證據：scoped counter 真的執行"
+else
+    assert_eq "scoped marker 存在" "不存在" "⑨c --all 證據：scoped counter 真的執行"
+fi
+rm -f "$RT_R9/ran-scoped.marker"
+echo 1 > "$RT_R9/scoped.value"
 echo x > "$RT_R9/plain.txt"
 git -C "$RT_R9" add plain.txt
 git -C "$RT_R9" commit -qm "irrelevant change"
 rt_run "$RT_R9"
-assert_contains "$RT_OUT" "scoped=skip(無相關變更" "⑨c 非宣告 pathspec 的變更 → 仍 skip"
+assert_contains "$RT_OUT" "scoped=skip(無相關變更" "⑨d 非宣告 pathspec 的變更 → 仍 skip"
 echo x > "$RT_R9/note.md"
 git -C "$RT_R9" add note.md
 git -C "$RT_R9" commit -qm "relevant change"
 rt_run "$RT_R9"
-assert_contains "$RT_OUT" "scoped=1(<=1)" "⑨d 宣告 pathspec 有變更 → 實跑"
+assert_contains "$RT_OUT" "scoped=1(<=1)" "⑨e 宣告 pathspec 有變更 → 實跑"
 if [ -f "$RT_R9/ran-scoped.marker" ]; then
-    assert_eq "yes" "yes" "⑨d 實跑證據：counter 執行"
+    assert_eq "yes" "yes" "⑨e 實跑證據：counter 執行"
 else
-    assert_eq "scoped marker 存在" "不存在" "⑨d 實跑證據：counter 執行"
+    assert_eq "scoped marker 存在" "不存在" "⑨e 實跑證據：counter 執行"
 fi
 
 # ── ⑩ --count <name> 與 --count-<name> 糖衣等價 ───────────────────
