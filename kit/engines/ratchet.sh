@@ -9,6 +9,7 @@
 #
 # 用法：
 #   bash engines/ratchet.sh                    # 比對模式（branch 用，pre-push 呼叫）
+#   bash engines/ratchet.sh --all              # 全量比對（deep lane 用，不套 slow/scope skip）
 #   bash engines/ratchet.sh --tighten          # 收緊模式（僅限 base_branch 手動執行）
 #   RATCHET_ALLOW_TIGHTEN=1 ... --tighten      # 測試豁免，非 base_branch 也可跑
 #   bash engines/ratchet.sh --report           # 唯讀現值報告（恆 exit 0）
@@ -100,11 +101,14 @@ set -o pipefail
 # ---------- 參數（模式＋測試 seam） ----------
 
 ratchet_mode="compare"
+ratchet_force_all=0
 ratchet_count_name=""
 ratchet_decl_dir=""
 ratchet_repo_root_arg=""
 while [ $# -gt 0 ]; do
   case "${1}" in
+    --all)
+      ratchet_mode="compare"; ratchet_force_all=1; shift ;;
     --tighten)
       ratchet_mode="tighten"; shift ;;
     --report)
@@ -386,12 +390,12 @@ ratchet_summary=""
 for ratchet_name in ${ratchet_counter_names}; do
   ratchet_baseline="$(ratchet_baseline_value "${ratchet_name}")"
 
-  if [ "${RATCHET_FULL:-}" != "1" ] && ratchet_is_slow_counter "${ratchet_name}"; then
+  if [ "${ratchet_force_all}" != "1" ] && [ "${RATCHET_FULL:-}" != "1" ] && ratchet_is_slow_counter "${ratchet_name}"; then
     ratchet_summary="${ratchet_summary}${ratchet_name}=skip(慢 counter，由 wave-gate RATCHET_FULL=1 承擔) "
     continue
   fi
 
-  if ratchet_counter_skippable "${ratchet_name}"; then
+  if [ "${ratchet_force_all}" != "1" ] && ratchet_counter_skippable "${ratchet_name}"; then
     ratchet_summary="${ratchet_summary}${ratchet_name}=skip(無相關變更，沿用 baseline ${ratchet_baseline}) "
     continue
   fi
