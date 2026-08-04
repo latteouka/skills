@@ -122,5 +122,5 @@ for id in ${new_ids}; do
   printf 'hit:%s:%s\n' "${rel}" "${id}" >> "${seen}" 2>/dev/null || true
 done
 log_append hit "${new_ids}"
-echo "rtm-reminder: ${rel} 屬 RTM 條目 ${new_ids}——若本次是行為變更，請對照 ${matrix_dir}/ 對應條目確認/回寫（detail_specs/impl_details/status）；純重構/樣式可忽略本提醒" >&2
+echo "rtm-reminder: ${rel} 屬 RTM 條目 ${new_ids}——若本次是行為變更，請對照 ${matrix_dir}/ 對應條目回寫（detail_specs/impl_details/status）。回寫守則：①先站在被驗收者角度檢視條目現況——欄位已偏離現狀就整段重寫，不要只 append 疊行；②detail_specs＝給承辦人的正式文書：零程式識別字（函式/元件名、issue/B-編號不進），技術名詞轉業務用語（如 party→關係人、Dialog→對話框），SSO/API/IMEI/GPS 等常見縮寫與（2碼）類格式說明可留；impl_details 才放 code 定位。純重構/樣式可忽略本提醒" >&2
 exit 2
