@@ -122,8 +122,8 @@ RH_S3RC=$?
 assert_eq "0" "$RH_S3RC" "S3 無 runtime → exit 0（fail-open）"
 assert_contains "$RH_S3OUT" "無可用 runtime" "S3 無法重生明示"
 
-# ═══ S4 重生（runtime-gated；SKIP 分支佔位維持斷言數）═══
-RH_RT_EXPECTED=4
+# ═══ S4+S5 重生（runtime-gated；SKIP 分支佔位維持斷言數）═══
+RH_RT_EXPECTED=8
 RH_RT_START=$TESTS_RUN
 RH_RT_SKIP_START=$TESTS_SKIPPED
 
@@ -165,6 +165,41 @@ EOF
     RH_S4HDR="$(head -1 "$RH_S4/.claude/kit/rtm-index.tsv" | sed -n 's/.*matrix_hash=sha256:\([0-9a-f]*\).*/\1/p')"
     assert_eq "$(rh_bash_hash "$RH_S4/docs/rtm/matrix")" "$RH_S4HDR" "S4 重生後 header hash 新鮮"
     rm -rf "$RH_S4"
+
+    # ═══ S5 linked worktree 無 node_modules：借用同 repo 主 checkout 的依賴重生 ═══
+    RH_S5_MAIN="$(mktemp -d)"
+    RH_S5_WT="$(mktemp -d)"
+    git -C "$RH_S5_MAIN" init -q
+    git -C "$RH_S5_MAIN" config user.email "kit-test@example.invalid"
+    git -C "$RH_S5_MAIN" config user.name "kit test"
+    mkdir -p "$RH_S5_MAIN/.claude/kit" "$RH_S5_MAIN/docs/rtm/matrix" "$RH_S5_MAIN/src"
+    printf '{"name":"rtm-worktree-fixture","private":true}\n' > "$RH_S5_MAIN/package.json"
+    printf 'matrix_dir: "docs/rtm/matrix"\n' > "$RH_S5_MAIN/.claude/kit/kit.yaml"
+    printf 'export const x = 1;\n' > "$RH_S5_MAIN/src/thing.ts"
+    cat > "$RH_S5_MAIN/docs/rtm/matrix/010.yaml" <<'EOF'
+{ "meta": { "section": "R", "total_clauses": 1 },
+  "entries": [ { "req_id": "R-1", "req_text": "t", "status": "implemented",
+    "detail_specs": ["s"], "impl_details": ["src/thing.ts"] } ] }
+EOF
+    git -C "$RH_S5_MAIN" add .
+    git -C "$RH_S5_MAIN" commit -qm "test fixture"
+    mkdir -p "$RH_S5_MAIN/node_modules/js-yaml"
+    printf '{"name":"js-yaml","version":"0.0.0-kitstub","main":"index.js"}\n' \
+        > "$RH_S5_MAIN/node_modules/js-yaml/package.json"
+    printf 'module.exports = { load: function (s) { return JSON.parse(s); } };\n' \
+        > "$RH_S5_MAIN/node_modules/js-yaml/index.js"
+    git -C "$RH_S5_MAIN" worktree add -qb linked-test "$RH_S5_WT"
+
+    RH_S5_DEPS="present"; [ -d "$RH_S5_WT/node_modules" ] || RH_S5_DEPS="absent"
+    assert_eq "absent" "$RH_S5_DEPS" "S5 linked worktree 確實沒有 node_modules"
+    RH_S5OUT="$(CLAUDE_PROJECT_DIR="$RH_S5_WT" bash "$RH_START" </dev/null 2>&1)"
+    RH_S5RC=$?
+    assert_eq "0" "$RH_S5RC" "S5 linked worktree 重生 → exit 0"
+    assert_contains "$RH_S5OUT" "rtm-index 已重生" "S5 借用主 checkout 依賴重生"
+    RH_S5IDX="no"; [ -f "$RH_S5_WT/.claude/kit/rtm-index.tsv" ] && RH_S5IDX="yes"
+    assert_eq "yes" "$RH_S5IDX" "S5 index 寫在 linked worktree"
+    git -C "$RH_S5_MAIN" worktree remove --force "$RH_S5_WT"
+    rm -rf "$RH_S5_MAIN" "$RH_S5_WT"
 else
     # 缺 runtime：以明示 SKIP 補到與 runtime 分支同數（計入 skipped、不計入
     # assertion 數）——記 caveat：重生路徑未在本機驗證。

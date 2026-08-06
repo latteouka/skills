@@ -22,7 +22,9 @@
 //      ["", "apps/web", "apps/web/src", "apps/web/prisma/schema"] 的參數化）
 //
 // [kit 參數化seam]
-//   CLI：--repo-root <path>（預設 git rev-parse --show-toplevel）、--emit-index
+//   CLI：--repo-root <path>（預設 git rev-parse --show-toplevel）、
+//     --dependency-root <path>（linked worktree 可借用同 repo 主 checkout 的 node_modules）、
+//     --emit-index
 //   宣告：<repo-root>/.claude/kit/kit.yaml（flat-key，與 lib/common.sh kit_decl_get
 //   同語意的 grep 式解析——不用 js-yaml 解 kit.yaml，維持與 bash 側消費者一致）：
 //     matrix_dir（預設 docs/rtm/matrix）
@@ -43,7 +45,8 @@
 // createRequire 從「目標專案」node_modules 解析（kit 零 node 依賴不變——
 // rtm 模組要求專案自備 js-yaml）。
 //
-// 用法：node kit/engines/rtm-check.ts --repo-root <path> [--decl-dir <path>] [--emit-index]
+// 用法：node kit/engines/rtm-check.ts --repo-root <path> [--dependency-root <path>]
+//   [--decl-dir <path>] [--emit-index]
 // 統計輸出：整體＋各檔 status 計數——pass 時仍輸出（最小覆蓋率報表；
 // 訊息與統計行格式逐位保留上游，dfaa parity 由 K5 🤖-C 合約看守）。
 
@@ -59,12 +62,15 @@ import { pathToFileURL } from "node:url";
 let ROOT = "";
 let emitIndex = false;
 let declDirOverride = "";
+let dependencyRoot = "";
 {
   const argv = process.argv.slice(2);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--repo-root") {
       ROOT = argv[++i] ?? "";
+    } else if (a === "--dependency-root") {
+      dependencyRoot = argv[++i] ?? "";
     } else if (a === "--decl-dir") {
       // 測試 seam（K2 引擎慣例）：宣告目錄覆寫，預設 <repo-root>/.claude/kit
       declDirOverride = argv[++i] ?? "";
@@ -88,6 +94,7 @@ if (!ROOT) {
   process.exit(1);
 }
 ROOT = path.resolve(ROOT);
+dependencyRoot = dependencyRoot ? path.resolve(dependencyRoot) : "";
 
 // --- kit.yaml flat-key 宣告解析（與 kit_decl_get 同語意）--------------------
 
@@ -142,14 +149,23 @@ const IMPL_REQUIRED = splitWs(declGet(KIT_YAML, "rtm_impl_details_required", "im
 const FALLBACK_BASES = splitWs(declGet(KIT_YAML, "impl_path_bases", ".")).map((b) => (b === "." ? "" : b));
 const KNOWN_NON_PATH_TOKENS = new Set(splitWs(declGet(KIT_YAML, "rtm_nonpath_tokens", "Next.js Node.js")));
 
-// --- js-yaml：createRequire 從目標專案 node_modules 解析（kit 零 node 依賴）---
+// --- js-yaml：createRequire 從專案 node_modules 解析（kit 零 node 依賴）---
 // monorepo 消費者（如 dfaa pnpm workspace）js-yaml 常只裝在 app workspace，
 // repo 根無頂層 symlink——解析基準依序試 ROOT → ROOT/<app_workspace>（宣告，
 // 缺鍵不試第二基準）。上游 dfaa rtm-check 本就從 apps/web 執行，此為漏掉的
-// 參數化（K6 讀側首啟實踩）。
+// 參數化（K6 讀側首啟實踩）。linked worktree 本身常沒有
+// node_modules；--dependency-root 只額外提供同 repo 主 checkout 的依賴解析基準，
+// matrix、git 檔案與 emit index 仍全部使用 ROOT，不共用產物。
 
 const APP_WORKSPACE = declGet(KIT_YAML, "app_workspace", "");
-const YAML_RESOLVE_BASES = [ROOT, ...(APP_WORKSPACE ? [path.join(ROOT, APP_WORKSPACE)] : [])];
+const YAML_RESOLVE_BASES = Array.from(
+  new Set([
+    ROOT,
+    ...(APP_WORKSPACE ? [path.join(ROOT, APP_WORKSPACE)] : []),
+    ...(dependencyRoot ? [dependencyRoot] : []),
+    ...(dependencyRoot && APP_WORKSPACE ? [path.join(dependencyRoot, APP_WORKSPACE)] : []),
+  ]),
+);
 
 let yamlLoad: ((s: string) => unknown) | undefined;
 for (const base of YAML_RESOLVE_BASES) {
