@@ -62,6 +62,21 @@ fi
 engine="${kit_root}/engines/rtm-check.ts"
 [ -f "${engine}" ] || exit 0
 
+# linked worktree 通常不重裝 node_modules。git common dir 在主 checkout 是
+# <repo>/.git，在 linked worktree 也指回同一處；因此只把主 checkout
+# 當作 js-yaml 依賴解析基準。engine 仍從 project_dir 讀 matrix/code 並
+# 把 index 寫回 project_dir，不共用 worktree 產物。
+dependency_root=""
+git_common_dir="$(git -C "${project_dir}" rev-parse --git-common-dir 2>/dev/null || true)"
+if [ -n "${git_common_dir}" ]; then
+  case "${git_common_dir}" in
+    /*) ;;
+    *) git_common_dir="${project_dir}/${git_common_dir}" ;;
+  esac
+  git_common_dir="$(cd "${git_common_dir}" 2>/dev/null && pwd -P)" || git_common_dir=""
+  [ -z "${git_common_dir}" ] || dependency_root="$(dirname "${git_common_dir}")"
+fi
+
 runtime=""
 node_ver="$(node --version 2>/dev/null || true)"
 if [ -n "${node_ver}" ]; then
@@ -85,7 +100,12 @@ if [ -z "${runtime}" ]; then
   exit 0
 fi
 
-out="$("${runtime}" "${engine}" --repo-root "${project_dir}" --emit-index 2>&1)"
+engine_args=(--repo-root "${project_dir}")
+if [ -n "${dependency_root}" ] && [ "${dependency_root}" != "${project_dir}" ]; then
+  engine_args+=(--dependency-root "${dependency_root}")
+fi
+engine_args+=(--emit-index)
+out="$("${runtime}" "${engine}" "${engine_args[@]}" 2>&1)"
 rc=$?
 if [ "${rc}" -eq 0 ]; then
   line="$(printf '%s\n' "${out}" | grep '^rtm-check: index' | head -1)"
