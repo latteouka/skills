@@ -93,9 +93,9 @@ Subagent-Driven（既定）／ Inline＋一句具體理由（記入 dashboard Me
 （收尾流程步驟 3 回掃 `docs/requirements/` 的結果：有 🔴🟡❓ 但無對應工作項者逐條列出，無則寫「無漏項」）
 
 ## 📋 未涵蓋決策
-<!-- 有裝 intake kit 的專案：整區刪除。未涵蓋項 append 到 .claude/dev/inbox.md
-     （from: grill:{題目}），由下次開波的 triage 一併處理，wave 不自維護此表。
-     此區僅供未裝 kit 的專案使用。 -->
+<!-- 本波當下的未涵蓋項速記；驗證過的真 blocker 另照 /issue 開單
+     （掛 blocked:verified＋hold:wave，body 註明來源 grill:{題目}），
+     阻塞解除後由下次開波的來源 1 掃到——wave 不自維護跨波清單。 -->
 | # | 決策 | 來源 | 為何本波不做 |
 |---|------|------|-------------|
 | 1 | [決策內容] | [spec §N / grill Q#] | [scope cut / blocker / 依賴未就緒] |

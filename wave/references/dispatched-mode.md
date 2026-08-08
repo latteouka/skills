@@ -23,9 +23,9 @@ Wave skill 原生為「人在場的互動波」設計:停點問人、收尾自�
 | merge 前檢查 | 不跑 | 只跑 typecheck(~90 秒,同步) |
 | merge | **禁止**(hook 會擋主 checkout commit/merge) | typecheck 綠→diff 分流→auto-merge;diff HOLD 不降級——碰敏感面照 merge,通知裡提示使用者看 diff |
 | dirty worktree | 收尾前把變更 commit 乾淨 | 偵測到未 commit 變更→自動 commit 繼續流程(不凍結等人) |
-| 完整品質閘門 | 不跑 | merge 後 deep lane:每 3 個 merge 跑完整 `wave-gate.sh baseline`,紅燈自動寫 inbox 開單→triage→dispatch 修復 |
+| 完整品質閘門 | 不跑 | merge 後 deep lane:每 3 個 merge 跑完整 `wave-gate.sh baseline`,紅燈自動開 issue→pctl dispatch 修復 |
 | worktree 清理 | 不清 | merge 後 remove+branch -D |
-| 待人事項 | append `.claude/dev/inbox.md` | triage→材料化→TG |
+| 待人事項 | 照 `/issue` 開單 | issue→TG 通知 |
 
 ## 各階段覆寫明細
 
