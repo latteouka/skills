@@ -161,15 +161,9 @@ Wave 會自動偵測工作模式：
 
 ## 依賴
 
-**Claude Code 使用者注意**：wave 的部分流程依賴 superpowers plugin（`claude-plugins-official` 市集）——**這是 plugin，不是內建**，需要先安裝：
+**不依賴 superpowers plugin。** wave 需要的能力全在本 repo 內：Phase 2.5 訪談用 `kit/brainstorm`、`kit/grill-me`、`kit/grill-with-docs`；Subagent-Driven 執行方式由 wave 自己的 `references/subagent-protocol.md` 定義；worktree 隔離直接用 `git worktree`。裝完本 repo 即可跑，Claude Code 與 Codex 行為一致。
 
-```
-claude 內執行：/plugin → Discover → 找 superpowers → 安裝並啟用
-```
-
-Wave 用到其中的：`brainstorming`（Phase 2.5 需求探索）、`using-git-worktrees`（隔離開發）、`subagent-driven-development`（Subagent-Driven 執行方式）、`writing-plans`。沒裝的話 Phase 2.5 與 Subagent-Driven 執行方式會觸發失敗——Inline 執行方式仍可用，但建議裝齊。
-
-Codex / Copilot / Gemini CLI：無 plugin 生態，wave 會以 inline 方式執行，brainstorming/grill 段落改為對話式進行。
+早期版本改編自 [superpowers](https://github.com/obra/superpowers)（MIT，見 `kit/LICENSE-superpowers`），已客製化為本工作流的副本，與上游不再同步。SDD scratch 目錄沿用 `.superpowers/` 這個名字，只是路徑名，與該 plugin 無關。
 
 ## 解除安裝
 
