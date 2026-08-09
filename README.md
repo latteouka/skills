@@ -37,10 +37,12 @@ install.sh 只掃 repo 根目錄下帶 `SKILL.md` 的資料夾。`kit/` 底下�
 | writing-for-agents | 撰寫 agent 讀的文件 | vendored |
 | wizard | 產出互動式 bash 引導精靈 | vendored |
 | prototype | 用拋棄式原型回答設計問題 | vendored |
-| kit/brainstorm | 需求模糊時先訪談再動手 | 原創 |
-| kit/grill-me | 逐題壓力測試計畫 | 原創 |
-| kit/grill-with-docs | 壓力測試 + 同步更新文件 | 原創 |
-| kit/debug | 系統化除錯流程 | 改編自 superpowers |
+| grilling | 壓力測試訪談引擎（frontier 批次問答） | vendored |
+| grill-me | 壓力測試計畫（轉呼 /grilling） | vendored |
+| grill-with-docs | 壓力測試 + 同步更新文件（轉呼 /grilling + /domain-modeling） | vendored |
+| domain-modeling | 領域模型與 ADR／CONTEXT 維護 | vendored |
+| debug | 系統化除錯流程（superpowers systematic-debugging） | vendored |
+| kit/brainstorm | 需求模糊時先訪談再動手 | 原創（改編自 superpowers 後深度客製） |
 
 **原創** = 本 repo 自行設計維護。**vendored** = 取自上游開源 repo，見 `vendors.conf`。
 

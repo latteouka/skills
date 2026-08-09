@@ -1,14 +1,7 @@
 ---
-name: debug
+name: systematic-debugging
 description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes
 ---
-
-> **來源**:改編自 [superpowers](https://github.com/obra/superpowers) by Jesse Vincent(MIT License,見 `../LICENSE-superpowers`)。
-> 本副本已針對本工作流客製,與上游不再同步。
->
-> 使用者的全域 CLAUDE.md 另有兩條戰術守則(能自己跑的診斷別外包、邊界蒐證一刀定論避免鬼打牆)
-> 與本流程框架互補:那兩條是快速戰術提醒,這裡是完整的四階段方法論(根因調查→模式分析→
-> 假設測試→實作)。
 
 # Systematic Debugging
 
@@ -181,9 +174,7 @@ You MUST complete each phase before proceeding to the next.
    - Automated test if possible
    - One-off test script if no framework
    - MUST have before fixing
-   - This kit has no dedicated test-driven-development skill — follow your
-     project's TDD conventions for writing the failing test first (e.g. a
-     CLAUDE.md TDD section)
+   - Use the `superpowers:test-driven-development` skill for writing proper failing tests
 
 2. **Implement Single Fix**
    - Address the root cause identified
@@ -195,10 +186,7 @@ You MUST complete each phase before proceeding to the next.
    - Test passes now?
    - No other tests broken?
    - Issue actually resolved?
-   - This kit has no dedicated verification-before-completion skill — follow
-     your project's own verification/review gate before claiming success
-     (e.g. re-run the test suite and confirm the output, or a project-level
-     governance skill if one exists)
+   - Use the `superpowers:verification-before-completion` skill before claiming success
 
 4. **If Fix Doesn't Work**
    - STOP
