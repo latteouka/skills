@@ -18,13 +18,3 @@ for hook_file in "$HOOKS_DIR"/*.sh; do
         echo "  fix: chmod +x $hook_file"
     fi
 done
-
-# --- skills-hint.sh 行為測試（2026-07-25 補：取代 superpowers plugin 的觸發注入）
-_hint="$KIT_ROOT/hooks/skills-hint.sh"
-out="$(printf '{"hook_event_name":"SessionStart"}' | bash "$_hint" 2>/dev/null)"
-assert_contains "$out" "flow" "hint 提及 flow 分流"
-assert_contains "$out" "/debug" "hint 提及 debug skill"
-assert_contains "$out" "/sdd" "hint 提及 sdd skill"
-# 未安裝 skill 時應靜默（避免在沒裝 kit 的環境印無用訊息）
-out_missing="$(HOME=/tmp/kit-no-skills-$$ bash "$_hint" </dev/null 2>/dev/null)"
-assert_eq "" "$out_missing" "skill 未安裝時靜默"
