@@ -41,7 +41,7 @@ install.sh 只掃 repo 根目錄下帶 `SKILL.md` 的資料夾。`kit/` 底下�
 | grill-me | 壓力測試計畫（轉呼 /grilling） | vendored |
 | grill-with-docs | 壓力測試 + 同步更新文件（轉呼 /grilling + /domain-modeling） | vendored |
 | domain-modeling | 領域模型與 ADR／CONTEXT 維護 | vendored |
-| debug | 系統化除錯流程（superpowers systematic-debugging） | vendored |
+| systematic-debugging | 系統化除錯流程 | vendored |
 | kit/brainstorm | 需求模糊時先訪談再動手 | 原創（改編自 superpowers 後深度客製） |
 
 **原創** = 本 repo 自行設計維護。**vendored** = 取自上游開源 repo，見 `vendors.conf`。
@@ -64,7 +64,7 @@ scripts/sync-vendors.sh apply --only ui-test   # 只升級單一個
 
 ## 依賴
 
-不依賴 superpowers plugin。`kit/debug` 早期改編自 [superpowers](https://github.com/obra/superpowers)（MIT，見 `kit/LICENSE-superpowers`），已客製化為本工作流的副本，與上游不再同步。
+不依賴 superpowers plugin。`systematic-debugging` 直接 vendored 自 [superpowers](https://github.com/obra/superpowers)（MIT）；`kit/brainstorm` 早期改編自同源（見 `kit/LICENSE-superpowers`），已深度客製、不再同步。
 
 ## wave 已退役
 
