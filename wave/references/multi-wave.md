@@ -41,7 +41,8 @@ Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由�
 
 1. 把 `wave-{id}.md` 狀態標 🗑️
 2. `/wave status` 不再顯示該波
-3. 不自動刪 worktree 或檔案——使用者想清理就手動清
+3. **不自動刪 worktree 或檔案**——放棄的波多半有未合併的東西，刪掉救不回
+4. **但保留必須留痕**：worktree 路徑 ＋ 一句「為何保留」記到該波的 issue 或 `wave-INDEX.md`。沒留痕的保留與遺忘的殘留無法區分，而放棄的波（dirty／unmerged）正是任何安全 reaper 都拒絕動的那類（見 AGENTS.md「Worktree 生命週期」）
 
 ## 合併協助
 
@@ -54,6 +55,6 @@ Worktree 建立的具體步驟見 **Phase 6 Step 1**。這裡說明設計理由�
 3. 改法矛盾（同一行改成不同東西）→ 列出衝突 + 兩波原始意圖，使用者裁定
 4. **Merge typecheck（強制，貼輸出才算合併完成）**：在 main 上跑專案 typecheck（~90 秒，同步）——任何紅燈先修再宣告合併完成。理由：merge 殘留 TS 錯誤曾多次上 main。E2E 子集與完整品質閘門不在此跑——由 merge 後 deep lane 承擔（`wave-gate.sh baseline`，紅燈寫 inbox 開單）。手動波與 dispatched 模式的 merge 前檢查標準統一為 typecheck-only
 5. **UX 補跑回收**：本波品質閘門若觸發降級規則（「待 UX 補跑」），此時 dev server 可用——立即補跑並回寫 wave-{id}.md，補跑完成才把狀態升級為「✅ 完成」
-6. 清理 worktree：環境有 `ExitWorktree` 工具用 `ExitWorktree({ action: "remove" })`；`discard_changes` 屬破壞性選項，僅在親自確認 worktree 無未合併變更後使用
+6. worktree 移除不在本節——merge 完成後由 wave skill 收尾流程**步驟 7** 負責（先 `cd` 回主 checkout 再移除，不加 `--force`）
 
 不自動 force merge——有矛盾必停，呈現衝突 + 推薦方案，使用者確認才執行。

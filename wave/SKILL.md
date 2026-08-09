@@ -608,7 +608,7 @@ E2E 開工前讀指南，解決問題後寫回指南。
    - **Q2 機器擋得住嗎？** → 是＝寫成 gate script／lint／測試，照 `/issue` 開單（body 註明來源 `errata:{wave-id}`，標題寫「補 gate: …」），**不進 CLAUDE.md**
    - **Q3 讀了會改變行為嗎？**（不是「知道就好」的常識）→ 是＝開 issue 標題冠「升級候選: CLAUDE.md」，實際落點由使用者裁定；否＝丟掉
    - 零條升級時在完成報告明寫「ERRATA N 條，全數判定為一次性，未升級」——沒寫＝沒判定
-5. **直接進入合併協助，不徵詢**——讀 [references/multi-wave.md](references/multi-wave.md)「合併協助」節照做（**單波也適用**：merge typecheck、UX 補跑回收、worktree 清理）。唯一仍要停的是步驟 3 的改法矛盾衝突（真需要使用者裁定改法），其餘一路做到 push 完成。**Dispatched 模式：本步與步驟 6 不適用**——push branch 即收尾終點，merge／清理由 supervisor 承擔（見「Dispatched 模式」節）
+5. **直接進入合併協助，不徵詢**——讀 [references/multi-wave.md](references/multi-wave.md)「合併協助」節照做（**單波也適用**：merge typecheck、UX 補跑回收）。唯一仍要停的是步驟 3 的改法矛盾衝突（真需要使用者裁定改法），其餘一路做到 push 完成。**Dispatched 模式：本步與步驟 6、7 不適用**——push branch 即收尾終點，merge／清理由 supervisor 承擔（見「Dispatched 模式」節）
 6. **merge 後清除本波產物**（`bash <kit>/scripts/wave-close.sh {id}`）——波的 dashboard 與
    ledger 在 merge 之後對未來沒有價值，內容留在 git history 即可。腳本會驗證每個檔都已提交
    且無未提交修改（任一不符即中止），把 `git show` 取回指令寫進 `wave-INDEX.md`，再 `git rm`
@@ -621,6 +621,13 @@ E2E 開工前讀指南，解決問題後寫回指南。
      `wave-*.md`：**0 個有 frontmatter**，包含當天剛完成、走完整流程且閘門全綠的
      5 個波。條文寫得再明確也沒被執行，於是熱區只增不減。改成呼叫一個指令，消掉兩個失敗點：
      收尾者要記得寫且格式要對、hook 要在 N 天後正確觸發。`archive.sh` 仍在，角色降為漏網補救。
+7. **移除本波 worktree**（收工必移除，規則見 AGENTS.md「Worktree 生命週期」）——步驟 6 清的是
+   dashboard 與 ledger（KB 級文字檔），worktree 本身是 GB 級（`node_modules`／`.next`），要另外收。
+   - **先 `cd` 回主 checkout**——cwd 還在 worktree 內時移不掉
+   - 環境有 `ExitWorktree` 工具用 `ExitWorktree({ action: "remove" })`；否則 `git worktree remove <path>`
+   - 讓 git 的「不乾淨就拒絕」當第二道閘：被拒絕就把路徑與原因列進完成報告交使用者裁決，
+     **不加 `--force`、不用 `discard_changes`**
+   - 移除後 `git worktree list` 確認該路徑已消失——沒消失就是沒移除，照樣列進報告
 
 ## 多波並行
 
