@@ -44,7 +44,7 @@ install.sh 只掃 repo 根目錄下帶 `SKILL.md` 的資料夾。`kit/` 底下�
 
 **原創** = 本 repo 自行設計維護。**vendored** = 取自上游開源 repo，見 `vendors.conf`。
 
-`kit/` 另含共用元件：`engines/`（ratchet 品質債計數器、canary）、`gates/`、`hooks/`、`tests/`。
+`kit/` 另含被 dfaa hooks 與 pctl deep-lane 呼叫的引擎：`engines/`（ratchet、rtm-check）、`gates/`（hook-wiring-check、reqsync 系）、`hooks/`（rtm 系）——kit 的角色是引擎 bin，品管由呼叫端的 hook 機制承擔，不靠文件。
 
 ## 升級 vendored skills
 
