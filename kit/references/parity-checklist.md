@@ -24,12 +24,10 @@ cmd-a＝dfaa 舊腳本、cmd-b＝kit 對應。狀態型腳本每個子指令分�
 
 | dfaa 舊腳本 | kit 對應 | 狀態面 | 建議 --state-glob／注意 |
 |---|---|---|---|
-| `scripts/hooks/wave-closure-lock.sh` | `kit/gates/merge-train/wave-closure-lock.sh` | closure lock：git-common-dir 下 `wave-closure.lock/` | `--state-glob ".git/wave-closure.lock*"`；acquire／release／status 各驗一輪 |
-| `scripts/hooks/wave-regate-guard.sh` | `kit/gates/merge-train/wave-regate-guard.sh` | regate stamp＋preauth：`.git/wave-regate-pass`、`.git/wave-regate-preauth` | `--state-glob ".git/wave-regate-*"`；stamp／preauth／check 各子指令分開比——check 會**消耗** preauth，正是串行污染母題 |
-| `scripts/hooks/wave-merge-prep.sh` | `kit/gates/merge-train/wave-merge-prep.sh` | 改依賴：merge 動 working tree＋index＋refs | working-tree 面向為主；`--workdir-rel` 對齊 repo 根 |
 | `scripts/hooks/ratchet.sh` | `kit/engines/ratchet.sh` | baseline：`quality-baseline.json`（tracked） | tighten 模式改 tracked 檔——working-tree 面向直接抓；比對模式與 tighten 模式分開跑 |
-| `scripts/hooks/wave-gate.sh` | `kit/engines/wave-gate.sh` | 組合狀態（編排呼叫上列腳本） | 先比葉子腳本、全綠後再比總編排，否則 DIFF 無法歸因 |
 | `scripts/hooks/__tests__/canary.sh` | `kit/engines/canary.sh` | 低狀態（scratch 自隔離） | 預設 glob 即可 |
+
+> wave 退役時移除四列（`wave-closure-lock`／`wave-regate-guard`／`wave-merge-prep`／`wave-gate`）——kit 側 `gates/merge-train/` 從未落地，dfaa 側對應腳本亦已不存在，兩邊皆為死列。
 
 ## 3. shim-probe（退役殼保真）
 
