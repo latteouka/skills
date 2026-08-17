@@ -29,8 +29,15 @@
 # 協定（上游語意逐段保留）：
 #   - 預設模式（比對）：逐 counter 現值 vs baseline。任一「現值 > baseline」→
 #     報告後 exit 1；全部「現值 ≤ baseline」→ 輸出 PASS 摘要、exit 0。此模式
-#     永不寫檔。counter 執行失敗 → 立即 exit 1（不續跑後面的 counter）。
-#     baseline 0 ＝硬擋（現值 1 即紅）。
+#     永不寫檔。baseline 0 ＝硬擋（現值 1 即紅）。
+#     counter 執行失敗（或輸出非單一非負整數）→ 記錄該支、**續跑其餘 counter**，
+#     迴圈結束後彙總列出所有壞掉的 counter 並 exit 1（仍 fail-closed）。
+#     為何不再「立即退出」（2026-08-17 改契約，dfaa #2916 四次同族事故實證）：
+#     counter 依字母序跑，立即退出會讓字母序在後的所有 counter 在那一輪
+#     **完全沒被量到**，而輸出只看得到第一個壞掉的那支——四次事故（baseline
+#     有鍵無檔／殘留死鎖／allowlist 殭屍條目／detector 同名重複鍵）都是同一個
+#     失效模式：一支壞 counter 遮蔽它之後的約 50 支，且每次都潛伏數十天到數月。
+#     fail-fast 省下的那幾秒，遠不及「紅燈只露一個」造成的診斷成本。
 #   - --tighten 模式：僅限 base_branch（RATCHET_ALLOW_TIGHTEN=1 可豁免，供測試用）。
 #     「現值 < baseline」→ 用 jq 把 baseline 改寫為現值；「現值 ≥ baseline」→
 #     不動檔案且仍 exit 0（tighten 不是 gate）。jq 逐鍵改寫，baseline 檔內
@@ -351,13 +358,19 @@ if [ "${ratchet_mode}" = "tighten" ]; then
   fi
 
   ratchet_any_change=0
+  ratchet_broken=""
   for ratchet_name in ${ratchet_counter_names}; do
     ratchet_current="$(ratchet_counter_value "${ratchet_name}")"
-    [ $? -eq 0 ] || { echo "ratchet: counter [${ratchet_name}] 執行失敗" >&2; exit 1; }
+    if [ $? -ne 0 ]; then
+      echo "ratchet: counter [${ratchet_name}] 執行失敗" >&2
+      ratchet_broken="${ratchet_broken}${ratchet_name} "
+      continue
+    fi
     case "${ratchet_current}" in
       ''|*[!0-9]*)
         echo "ratchet: counter [${ratchet_name}] 輸出非「單一非負整數」（[${ratchet_current}]），fail-closed，拒絕通過" >&2
-        exit 1
+        ratchet_broken="${ratchet_broken}${ratchet_name} "
+        continue
         ;;
     esac
     ratchet_baseline="$(ratchet_baseline_value "${ratchet_name}")"
@@ -375,6 +388,10 @@ if [ "${ratchet_mode}" = "tighten" ]; then
   if [ "${ratchet_any_change}" -eq 0 ]; then
     echo "ratchet: 無 counter 需要收緊（現值均 >= baseline，檔案不動）"
   fi
+  if [ -n "${ratchet_broken}" ]; then
+    echo "ratchet: 以下 counter 執行失敗、未參與本次收緊：${ratchet_broken}" >&2
+    exit 1
+  fi
   exit 0
 fi
 
@@ -387,6 +404,7 @@ fi
 
 ratchet_fail=0
 ratchet_summary=""
+ratchet_broken=""
 for ratchet_name in ${ratchet_counter_names}; do
   ratchet_baseline="$(ratchet_baseline_value "${ratchet_name}")"
 
@@ -401,11 +419,18 @@ for ratchet_name in ${ratchet_counter_names}; do
   fi
 
   ratchet_current="$(ratchet_counter_value "${ratchet_name}")"
-  [ $? -eq 0 ] || { echo "ratchet: counter [${ratchet_name}] 執行失敗" >&2; exit 1; }
+  if [ $? -ne 0 ]; then
+    echo "ratchet: counter [${ratchet_name}] 執行失敗" >&2
+    ratchet_broken="${ratchet_broken}${ratchet_name} "
+    ratchet_fail=1
+    continue
+  fi
   case "${ratchet_current}" in
     ''|*[!0-9]*)
       echo "ratchet: counter [${ratchet_name}] 輸出非「單一非負整數」（[${ratchet_current}]），fail-closed，拒絕通過" >&2
-      exit 1
+      ratchet_broken="${ratchet_broken}${ratchet_name} "
+      ratchet_fail=1
+      continue
       ;;
   esac
 
@@ -418,6 +443,12 @@ for ratchet_name in ${ratchet_counter_names}; do
 done
 
 if [ "${ratchet_fail}" -eq 1 ]; then
+  if [ -n "${ratchet_broken}" ]; then
+    echo "ratchet: 以下 counter 執行失敗（其餘 counter 已照常比對，未被遮蔽）：${ratchet_broken}" >&2
+  fi
+  # 紅燈時也把已量到的值全印出來——否則「哪些 counter 其實是好的」同樣被遮蔽，
+  # 診斷時得再跑一輪才知道。刻意不用 PASS 前綴（有消費端在 parse 它）。
+  [ -n "${ratchet_summary}" ] && echo "ratchet: 已比對 -- ${ratchet_summary}"
   exit 1
 fi
 
