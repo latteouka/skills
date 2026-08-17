@@ -4,7 +4,7 @@
 # ②--tighten 三態：<收緊、=不動、>不動且仍 exit 0（tighten 不是 gate）
 #   ＋baseline 非 counter 鍵（allowlist 陣列）改寫後守恆＋非 base_branch 擋／豁免
 # ③--report 含失敗 counter → 該行 ERROR 且仍 exit 0
-# ④compare 模式 counter return 1 → 立即 exit 1（後續 counter 不執行）
+# ④compare 模式 counter return 1 → 記錄並續跑其餘 counter，彙總後 exit 1
 # ⑤雙向核對兩態各紅（有鍵無檔／有檔無鍵）＋0 個 counter 檔 fail-closed
 # ⑥baseline 0 硬擋
 # ⑦slow counter 五態（compare 跳過／RATCHET_FULL=1、--all 跑／tighten、report 不受影響）
@@ -105,6 +105,23 @@ RT_ENV="RATCHET_ALLOW_TIGHTEN=1"
 rt_run "$RT_R2" --tighten
 assert_eq "0" "$RT_RC" "②e RATCHET_ALLOW_TIGHTEN=1 豁免可跑"
 
+# ②f tighten 遇壞 counter：字母序在後的仍收緊得到，壞的彙總報告後 exit 1
+# （dfaa #2916 實測：舊語意下第 9 支壞掉 → 前 8 支已寫檔、後面全沒跑，
+#   輸出只看得到那一支，得逐次修才知道還有幾支）
+RT_R2F="$(rt_new_repo)"
+rt_counter "$RT_R2F" aa-broken
+rt_counter "$RT_R2F" zz-shrinks
+rt_baseline "$RT_R2F" '{"aa-broken": 1, "zz-shrinks": 9}'
+echo 2 > "$RT_R2F/zz-shrinks.value"
+# aa-broken.value 不存在 → 字典序第一支就壞
+RT_ENV=""
+rt_run "$RT_R2F" --tighten
+assert_eq "1" "$RT_RC" "②f tighten 有壞 counter → exit 1"
+assert_contains "$RT_OUT" "counter [aa-broken] 執行失敗" "②f 指名壞掉的 counter"
+assert_contains "$RT_OUT" "未參與本次收緊" "②f 明說壞的那支沒收緊"
+assert_eq "2" "$(jq -r '.counters."zz-shrinks"' "$RT_R2F/quality-baseline.json")" \
+    "②f 字母序在壞 counter 之後的仍正常收緊（不被遮蔽）"
+
 # ── ③ --report 含失敗 counter → ERROR 行且仍 exit 0 ───────────────
 RT_R3="$(rt_new_repo)"
 rt_counter "$RT_R3" good
@@ -117,21 +134,28 @@ assert_eq "0" "$RT_RC" "③report 含失敗 counter 仍 exit 0（不是 gate）"
 assert_contains "$RT_OUT" "bad=ERROR（counter 執行失敗，baseline=7）" "③失敗 counter 印 ERROR 行"
 assert_contains "$RT_OUT" "good=2(baseline=5)" "③正常 counter 印 現值(baseline=X)"
 
-# ── ④ compare counter 失敗 → 立即 exit 1（後續 counter 不執行） ────
+# ── ④ compare counter 失敗 → 續跑其餘 counter，彙總後 exit 1 ────
+# 契約於 2026-08-17 由「立即退出」改為「記錄並續跑」：立即退出會讓字母序在後的
+# counter 完全沒被量到，而 dfaa #2916 的四次同族事故都是「一支壞 counter 遮蔽
+# 之後約 50 支」——紅燈只露一個，每次都潛伏數十天到數月才被發現。
 RT_R4="$(rt_new_repo)"
 rt_counter "$RT_R4" aa-fail
+rt_counter "$RT_R4" mm-alsofail
 rt_counter "$RT_R4" zz-later
-rt_baseline "$RT_R4" '{"aa-fail": 1, "zz-later": 1}'
+rt_baseline "$RT_R4" '{"aa-fail": 1, "mm-alsofail": 1, "zz-later": 1}'
 echo 0 > "$RT_R4/zz-later.value"
-# aa-fail.value 不存在 → 字典序第一個 counter 就失敗
+# aa-fail.value 與 mm-alsofail.value 皆不存在 → 兩支都失敗
 rt_run "$RT_R4"
-assert_eq "1" "$RT_RC" "④counter 失敗 → exit 1"
+assert_eq "1" "$RT_RC" "④counter 失敗 → exit 1（仍 fail-closed）"
 assert_contains "$RT_OUT" "counter [aa-fail] 執行失敗" "④明確指名失敗的 counter"
+assert_contains "$RT_OUT" "counter [mm-alsofail] 執行失敗" "④第二支失敗的 counter 也被指名（不被第一支遮蔽）"
+assert_contains "$RT_OUT" "aa-fail mm-alsofail" "④彙總列出所有壞掉的 counter"
 if [ -f "$RT_R4/ran-zz-later.marker" ]; then
-    assert_eq "後續 counter 未執行" "marker 存在（zz-later 被執行了）" "④立即退出：後續 counter 不執行"
+    assert_eq "yes" "yes" "④續跑：字母序在失敗 counter 之後的仍被執行"
 else
-    assert_eq "yes" "yes" "④立即退出：後續 counter 不執行"
+    assert_eq "後續 counter 已執行" "marker 不存在（zz-later 被遮蔽了）" "④續跑：字母序在失敗 counter 之後的仍被執行"
 fi
+assert_contains "$RT_OUT" "已比對 -- zz-later=0" "④紅燈時仍印出已量到的值（好的 counter 不被遮蔽）"
 
 # ── ⑤ 雙向核對兩態各紅＋0 counter 檔 fail-closed ──────────────────
 RT_R5="$(rt_new_repo)"
